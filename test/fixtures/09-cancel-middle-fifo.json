@@ -1,0 +1,92 @@
+{
+  "name": "09-cancel-middle-fifo",
+  "description": "Cancels middle order in FIFO queue at price 100",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "ADD",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 20,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "ADD",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 30,
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "type": "CANCEL",
+      "order_id": 2,
+      "participant_id": 102,
+      "seq": 4,
+      "ts": 1003
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 20,
+      "seq": 2
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 30,
+      "seq": 3
+    },
+    {
+      "event": "ORDER_CANCELLED",
+      "order_id": 2,
+      "participant_id": 102,
+      "price": 100,
+      "remaining_qty": 20,
+      "side": "BUY",
+      "seq": 4
+    }
+  ],
+  "expected_book": {
+    "best_bid": { "price": 100, "total_volume": 40, "order_count": 2 },
+    "best_ask": null,
+    "depth": {
+      "bids": [{ "price": 100, "quantity": 40, "order_count": 2 }],
+      "asks": []
+    }
+  }
+}

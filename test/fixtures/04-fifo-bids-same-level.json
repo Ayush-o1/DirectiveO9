@@ -1,0 +1,76 @@
+{
+  "name": "04-fifo-bids-same-level",
+  "description": "Places three bids at the same price level aggregating volume",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 5,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "ADD",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 15,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "ADD",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 20,
+      "seq": 3,
+      "ts": 1002
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 5,
+      "seq": 1
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 15,
+      "seq": 2
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 20,
+      "seq": 3
+    }
+  ],
+  "expected_book": {
+    "best_bid": { "price": 100, "total_volume": 40, "order_count": 3 },
+    "best_ask": null,
+    "depth": {
+      "bids": [{ "price": 100, "quantity": 40, "order_count": 3 }],
+      "asks": []
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "03-bid-and-ask-spread",
+  "description": "Places non-crossing bid and ask establishing inside market spread",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "ADD",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 102,
+      "quantity": 8,
+      "seq": 2,
+      "ts": 1001
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 102,
+      "quantity": 8,
+      "seq": 2
+    }
+  ],
+  "expected_book": {
+    "best_bid": { "price": 100, "total_volume": 10, "order_count": 1 },
+    "best_ask": { "price": 102, "total_volume": 8, "order_count": 1 },
+    "depth": {
+      "bids": [{ "price": 100, "quantity": 10, "order_count": 1 }],
+      "asks": [{ "price": 102, "quantity": 8, "order_count": 1 }]
+    }
+  }
+}
