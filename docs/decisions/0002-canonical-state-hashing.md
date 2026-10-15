@@ -36,11 +36,25 @@ JavaScript environments present specific serialization pitfalls:
 Adopt Option 3:
 
 - Use JavaScript `Number` for prices (ticks), quantities (lots), and sequence numbers, validated strictly at the system boundary with `Number.isSafeInteger`.
-- Define an explicit canonical state representation in `src/engine/hash.js`.
-- Price levels, active orders, and instrument states are projected into canonical sorted arrays.
-- Object keys are sorted recursively via `Object.keys().sort()`.
-- Numbers are serialized as canonical base-10 strings; any BigInt is serialized as `${val.toString()}n`.
-- The canonical UTF-8 payload is hashed using SHA-256, returning a lowercase 64-character hex digest.
+- Implement deterministic state projection and SHA-256 canonical hashing in `src/engine/hash.js`.
+- The canonical state hash incorporates three authoritative components:
+  1. **Resting Orders in Price-Time Priority Order**:
+     - Projected per instrument, sorted alphabetically by symbol.
+     - `bids`: Sorted by price descending; within each price level, traversed strictly in FIFO queue order (`head` to `tail`).
+     - `asks`: Sorted by price ascending; within each price level, traversed strictly in FIFO queue order (`head` to `tail`).
+     - Order fields captured: `order_id`, `participant_id`, `price`, `remaining_qty`, `seq`, `ts`.
+     - _Why_: Guarantees that active market depth, priority queues, and resting liquidity match bit-for-bit down to the lot across any host architecture.
+  2. **Order Registry**:
+     - All active and resting order records across all instruments, sorted strictly by `order_id` ascending.
+     - Order fields captured: `order_id`, `participant_id`, `symbol`, `side`, `price`, `original_qty`, `remaining_qty`, `filled_qty`, `state`, `seq`, `ts`.
+     - _Why_: Verifies that internal order indexes, quantity conservation, remaining balances, and terminal state flags match perfectly without ghost or orphaned nodes.
+  3. **Trade Counter**:
+     - Global cumulative trade execution sequence counter (`trade_id_seq`).
+     - _Why_: Confirms that trade execution counts and match volumes are conserved and fully aligned with the durable trade ledger.
+- Canonical JSON serialization with recursive key sorting:
+  - Object keys are sorted lexicographically at every depth via `Object.keys().sort()`.
+  - Numbers format deterministically in exact base-10 strings.
+- The canonical UTF-8 payload is hashed using SHA-256, returning a lowercase 64-character hexadecimal digest.
 
 ## Consequences
 

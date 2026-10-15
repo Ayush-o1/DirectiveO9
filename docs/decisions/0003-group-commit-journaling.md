@@ -36,11 +36,12 @@ Adopt Option 3:
 - Incoming commands are enqueued with their resolution/rejection callbacks.
 - When the batch reaches `BATCH_MAX_SIZE` (default: 100) or `BATCH_TIMEOUT_MS` (default: 5ms) elapses, the sequencer flushes the batch via a parameterized multi-row `INSERT INTO commands (seq, ts, participant_id, client_order_id, type, payload) VALUES ...`.
 - Commands are ordered and sequenced strictly before journal insertion.
-- The default database configuration uses `synchronous_commit = on` to guarantee absolute crash durability.
+- The default database configuration uses `synchronous_commit = on` to guarantee absolute crash durability (PostgreSQL Official Documentation, Section 20.5.1 "Write-Ahead Log - synchronous_commit" and Section 30.5 "Asynchronous Commit").
 - The `synchronous_commit` level is exposed as a configurable parameter (`on`, `off`, `remote_write`) for benchmarking throughput ceilings.
 
 ## Consequences
 
-- Durability is guaranteed prior to acknowledging HTTP requests.
-- I/O throughput scales effectively under high concurrency by batching disk flushes.
+- Durability is guaranteed prior to acknowledging HTTP requests (RPO = 0).
+- I/O throughput scales effectively under high concurrency by batching disk flushes across micro-batches.
 - If a batch insertion fails (e.g., database network disconnect), all commands in the pending batch are rejected cleanly without engine state corruption.
+- Full details and architectural trade-offs are documented in `docs/spec.md` Section 14.

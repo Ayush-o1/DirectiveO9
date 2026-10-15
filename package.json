@@ -8,9 +8,11 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test",
-    "test:coverage": "c8 --reporter=text --reporter=lcov node --test",
+    "test": "node --test --test-concurrency=1",
+    "test:coverage": "c8 --reporter=text --reporter=lcov node --test --test-concurrency=1",
     "test:diff:long": "LONG_DIFF=true node --test test/differential.test.js",
+    "replay": "node scripts/replay.js",
+    "chaos:kill": "node scripts/chaos.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

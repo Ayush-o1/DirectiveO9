@@ -7,6 +7,8 @@ import {
   registerInstrumentSchema,
   registerParticipantSchema,
 } from './validation.js';
+import { computeStateHash } from '../engine/hash.js';
+import { replayJournal } from '../sequencer/replay.js';
 
 export function createApp({ sequencer, pool, adminKey }) {
   const app = express();
@@ -239,6 +241,7 @@ export function createApp({ sequencer, pool, adminKey }) {
     const heartbeatTimer = setInterval(() => {
       res.write(`event: heartbeat\ndata: {"ts":${Date.now()}}\n\n`);
     }, 15000);
+    heartbeatTimer.unref();
 
     req.on('close', () => {
       clearInterval(heartbeatTimer);
@@ -313,17 +316,142 @@ export function createApp({ sequencer, pool, adminKey }) {
     }
   });
 
-  // 11. Admin: Invariant Verification
-  app.get('/admin/verify', adminAuth, (req, res) => {
+  // 11. Admin: Invariant and Database Verification
+  app.get('/admin/verify', adminAuth, async (req, res) => {
     try {
+      // 1. Engine memory invariants
       sequencer.engine.checkInvariants();
+
+      const checks = {
+        book_never_crossed: true,
+        single_location: true,
+        non_zero_quantity: true,
+        quantity_conservation: true,
+        volume_conservation: true,
+        gap_free_sequence: true,
+        orders_table_in_sync: true,
+        bought_equals_sold: true,
+      };
+
+      // 2. Database Checks (if pool configured)
+      if (pool) {
+        // a. Gap-free sequence check
+        const { rows: seqRows } = await pool.query(
+          'SELECT MIN(seq) AS min_seq, MAX(seq) AS max_seq, COUNT(*) AS count FROM commands'
+        );
+        const count = Number(seqRows[0]?.count || 0);
+        if (count > 0) {
+          const minSeq = Number(seqRows[0].min_seq);
+          const maxSeq = Number(seqRows[0].max_seq);
+          if (minSeq !== 1 || count !== maxSeq - minSeq + 1) {
+            checks.gap_free_sequence = false;
+            throw new Error(
+              `Database commands contain sequence gaps: count=${count}, min=${minSeq}, max=${maxSeq}`
+            );
+          }
+        }
+
+        // b. Per-symbol bought equals sold
+        const { rows: tradeRows } = await pool.query(
+          `SELECT symbol,
+                  SUM(CASE WHEN taker_side = 'BUY' THEN quantity ELSE 0 END) AS taker_bought,
+                  SUM(CASE WHEN taker_side = 'SELL' THEN quantity ELSE 0 END) AS maker_bought,
+                  SUM(CASE WHEN taker_side = 'SELL' THEN quantity ELSE 0 END) AS taker_sold,
+                  SUM(CASE WHEN taker_side = 'BUY' THEN quantity ELSE 0 END) AS maker_sold,
+                  SUM(quantity) AS total_volume
+           FROM trades
+           GROUP BY symbol`
+        );
+        for (const tr of tradeRows) {
+          const totalBought = Number(tr.taker_bought) + Number(tr.maker_bought);
+          const totalSold = Number(tr.taker_sold) + Number(tr.maker_sold);
+          if (totalBought !== totalSold || totalBought !== Number(tr.total_volume)) {
+            checks.bought_equals_sold = false;
+            throw new Error(
+              `Per-symbol bought does not equal sold for ${tr.symbol}: bought=${totalBought}, sold=${totalSold}`
+            );
+          }
+        }
+
+        // c. Orders table equals engine state
+        const { rows: dbOrders } = await pool.query(
+          `SELECT order_id, remaining_qty, state
+           FROM orders
+           WHERE state IN ('NEW', 'PARTIALLY_FILLED')
+           ORDER BY order_id ASC`
+        );
+
+        const memoryActiveOrders = Array.from(sequencer.engine.orders.values())
+          .filter(o => o.state === 'NEW' || o.state === 'PARTIALLY_FILLED')
+          .sort((a, b) => a.order_id - b.order_id);
+
+        if (dbOrders.length !== memoryActiveOrders.length) {
+          checks.orders_table_in_sync = false;
+          throw new Error(
+            `Orders table count mismatch: DB has ${dbOrders.length} active orders, engine has ${memoryActiveOrders.length}`
+          );
+        }
+
+        for (let i = 0; i < dbOrders.length; i++) {
+          const dbo = dbOrders[i];
+          const memo = memoryActiveOrders[i];
+          if (
+            Number(dbo.order_id) !== Number(memo.order_id) ||
+            Number(dbo.remaining_qty) !== Number(memo.remaining_qty) ||
+            dbo.state !== memo.state
+          ) {
+            checks.orders_table_in_sync = false;
+            throw new Error(
+              `Order mismatch at order ${dbo.order_id}: DB=${dbo.state}(${dbo.remaining_qty}) vs Engine=${memo.state}(${memo.remaining_qty})`
+            );
+          }
+        }
+      }
+
+      const canonicalHash = computeStateHash(sequencer.engine);
+
       return res.json({
         invariants_passed: true,
+        checks,
         current_seq: sequencer.lastSeq,
+        canonical_hash: canonicalHash,
       });
     } catch (err) {
       return res.status(500).json({
         invariants_passed: false,
+        error: err.message,
+      });
+    }
+  });
+
+  // 12. Admin: Deterministic Replay
+  app.post('/admin/replay', adminAuth, async (req, res) => {
+    const fromSeq = req.body?.fromSeq || req.body?.from_seq || 1;
+    const toSeq = req.body?.toSeq || req.body?.to_seq || null;
+    const oracle = Boolean(req.body?.oracle);
+
+    try {
+      const result = await replayJournal({
+        pool,
+        fromSeq: Number(fromSeq),
+        toSeq: toSeq !== null ? Number(toSeq) : null,
+        oracle,
+      });
+
+      if (!result.verified) {
+        return res.status(409).json({
+          status: 'DIVERGED',
+          ...result,
+        });
+      }
+
+      return res.json({
+        status: 'VERIFIED',
+        ...result,
+      });
+    } catch (err) {
+      return res.status(500).json({
+        status: 'ERROR',
         error: err.message,
       });
     }
