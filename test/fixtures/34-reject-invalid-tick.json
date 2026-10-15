@@ -1,0 +1,37 @@
+{
+  "name": "34-reject-invalid-tick",
+  "description": "Order submitted with non-multiple of tick_size is rejected with INVALID_TICK",
+  "symbol": "BTC-USDT",
+  "tick_size": 5,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "LIMIT",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 103,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_REJECTED",
+      "code": "INVALID_TICK",
+      "order_id": 1,
+      "participant_id": 101,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": null,
+    "depth": {
+      "bids": [],
+      "asks": []
+    }
+  }
+}

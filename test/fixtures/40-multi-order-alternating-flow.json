@@ -1,0 +1,164 @@
+{
+  "name": "40-multi-order-alternating-flow",
+  "description": "Complex workflow with resting limits, cancellations, and aggressive sweeps",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "LIMIT",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 99,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "LIMIT",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 102,
+      "quantity": 15,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "LIMIT",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "SELL",
+      "price": 101,
+      "quantity": 5,
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "type": "CANCEL",
+      "order_id": 1,
+      "participant_id": 101,
+      "seq": 4,
+      "ts": 1003
+    },
+    {
+      "type": "MARKET",
+      "order_id": 4,
+      "participant_id": 104,
+      "side": "BUY",
+      "quantity": 8,
+      "seq": 5,
+      "ts": 1004
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": 99,
+      "quantity": 10,
+      "remaining_qty": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 102,
+      "quantity": 15,
+      "remaining_qty": 15,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 3,
+      "participant_id": 103,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 101,
+      "quantity": 5,
+      "remaining_qty": 5,
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "event": "ORDER_CANCELLED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": 99,
+      "original_qty": 10,
+      "remaining_qty": 10,
+      "reason": "CLIENT_CANCEL",
+      "seq": 4,
+      "ts": 1003
+    },
+    {
+      "event": "TRADE_EXECUTED",
+      "trade_id": 1,
+      "symbol": "BTC-USDT",
+      "price": 101,
+      "quantity": 5,
+      "maker_order_id": 3,
+      "taker_order_id": 4,
+      "maker_participant_id": 103,
+      "taker_participant_id": 104,
+      "taker_side": "BUY",
+      "seq": 5,
+      "ts": 1004
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 3,
+      "participant_id": 103,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 101,
+      "filled_qty": 5,
+      "seq": 5,
+      "ts": 1004
+    },
+    {
+      "event": "TRADE_EXECUTED",
+      "trade_id": 2,
+      "symbol": "BTC-USDT",
+      "price": 102,
+      "quantity": 3,
+      "maker_order_id": 2,
+      "taker_order_id": 4,
+      "maker_participant_id": 102,
+      "taker_participant_id": 104,
+      "taker_side": "BUY",
+      "seq": 5,
+      "ts": 1004
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 4,
+      "participant_id": 104,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": null,
+      "filled_qty": 8,
+      "seq": 5,
+      "ts": 1004
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": { "price": 102, "total_volume": 12, "order_count": 1 },
+    "depth": {
+      "bids": [],
+      "asks": [{ "price": 102, "quantity": 12, "order_count": 1 }]
+    }
+  }
+}

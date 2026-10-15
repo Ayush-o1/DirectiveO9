@@ -51,14 +51,16 @@ The matching engine verifies six structural invariants across state transitions 
 
 ---
 
-## Order Book Core
+## Order Book Core & Matching Engine
 
-The order book (`src/engine/book.js`) maintains deterministic price-time priority (FIFO):
+The order book and matching engine (`src/engine/`) maintain deterministic price-time priority (FIFO):
 
 - **Sorted Price Levels (`src/engine/level.js`)**: Sorted arrays of price points (`bids` descending, `asks` ascending) indexed using binary search.
 - **Price Level FIFO Queues (`src/engine/queue.js`)**: Doubly linked lists per price level supporting O(1) order enqueuing and O(1) head dequeuing.
 - **Order Lookup Index**: Direct map of active orders (`Map<order_id, Node>`) enabling O(1) cancellation and pointer unlinking.
-- **Golden Scenarios (`test/fixtures/`)**: 16 language-neutral JSON scenario specifications defining sequential input commands, expected emitted events, and verified book depth states.
+- **Matching Pipeline (`src/engine/engine.js`)**: Multi-instrument matching engine supporting `LIMIT`, `MARKET`, `IOC`, and `CANCEL` commands with multi-level liquidity sweeping and strict quantity conservation.
+- **Differential Verification (`test/differential.test.js`)**: Independent naive reference oracle (`test/oracle/naive-engine.js`) written with plain arrays and linear scans, fuzz-tested using `fast-check` with full state and depth differential comparison and online invariant validation.
+- **Golden Scenarios (`test/fixtures/`)**: 38 language-neutral JSON scenario specifications defining sequential input commands, expected emitted events, and verified book depth states.
 
 ---
 

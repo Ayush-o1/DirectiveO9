@@ -1,0 +1,123 @@
+{
+  "name": "23-limit-fifo-at-price-level",
+  "description": "Verifies FIFO priority execution among multiple resting orders at same price",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "LIMIT",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "SELL",
+      "price": 100,
+      "quantity": 5,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "LIMIT",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 100,
+      "quantity": 10,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "LIMIT",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 8,
+      "seq": 3,
+      "ts": 1002
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 100,
+      "quantity": 5,
+      "remaining_qty": 5,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 100,
+      "quantity": 10,
+      "remaining_qty": 10,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "event": "TRADE_EXECUTED",
+      "trade_id": 1,
+      "symbol": "BTC-USDT",
+      "price": 100,
+      "quantity": 5,
+      "maker_order_id": 1,
+      "taker_order_id": 3,
+      "maker_participant_id": 101,
+      "taker_participant_id": 103,
+      "taker_side": "BUY",
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 100,
+      "filled_qty": 5,
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "event": "TRADE_EXECUTED",
+      "trade_id": 2,
+      "symbol": "BTC-USDT",
+      "price": 100,
+      "quantity": 3,
+      "maker_order_id": 2,
+      "taker_order_id": 3,
+      "maker_participant_id": 102,
+      "taker_participant_id": 103,
+      "taker_side": "BUY",
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 3,
+      "participant_id": 103,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": 100,
+      "filled_qty": 8,
+      "seq": 3,
+      "ts": 1002
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": { "price": 100, "total_volume": 7, "order_count": 1 },
+    "depth": {
+      "bids": [],
+      "asks": [{ "price": 100, "quantity": 7, "order_count": 1 }]
+    }
+  }
+}

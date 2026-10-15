@@ -1,0 +1,37 @@
+{
+  "name": "36-reject-non-positive-quantity",
+  "description": "Order submitted with non-positive quantity is rejected with NON_POSITIVE_QUANTITY",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "LIMIT",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 0,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_REJECTED",
+      "code": "NON_POSITIVE_QUANTITY",
+      "order_id": 1,
+      "participant_id": 101,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": null,
+    "depth": {
+      "bids": [],
+      "asks": []
+    }
+  }
+}

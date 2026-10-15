@@ -32,7 +32,7 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
 
 ---
 
-## Phase 2: Matching Engine & Differential Verification
+## Phase 2: Matching Engine & Differential Verification [Completed]
 
 - **Objective**: Implement multi-order matching, multi-level sweeps, order lifecycle, and differential property testing.
 - **Deliverables**:
@@ -41,11 +41,12 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
     - `MARKET` orders (immediate execution up to liquidity, remainder cancelled).
     - `IOC` orders (immediate execution up to limit price, remainder cancelled).
     - `CANCEL` orders (atomic unlinking and volume reduction).
-  - Input validation with enumerated reject codes (`INVALID_TICK`, `INVALID_LOT`, `UNKNOWN_INSTRUMENT`, etc.).
-  - Pure functional interface: `(state, command) -> (state', events)`.
-  - Independent naive reference oracle (`test/oracle/naive-engine.js`) built with linear scans for unbiased differential verification.
-  - Property-based testing harness using `fast-check` executing randomized command streams against both engines.
-  - Verification of the 6 core structural invariants after every state transition.
+  - Input validation with enumerated reject codes (`INVALID_TICK`, `INVALID_LOT`, `UNKNOWN_INSTRUMENT`, `INVALID_SIDE`, `NON_POSITIVE_QUANTITY`, `UNKNOWN_ORDER`, `NOT_OWNER`, `ALREADY_TERMINAL`, `DUPLICATE_ORDER`).
+  - Pure functional interface: engine does not mutate input commands or read the clock / randomness.
+  - Independent naive reference oracle (`test/oracle/naive-engine.js`) built strictly from `docs/spec.md` with plain arrays and linear scans for unbiased differential verification.
+  - Property-based testing harness using `fast-check` executing randomized command streams against both engines with online invariant checking.
+  - Determinism verification ensuring identical seeds generate identical event streams.
+  - 38 language-neutral golden scenario JSON fixtures (`test/fixtures/`) covering all lifecycle transitions, sweeps, and reject cases.
 
 ---
 

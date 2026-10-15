@@ -65,7 +65,133 @@ Any transition not explicitly permitted in this table is impossible and throws a
 
 ---
 
-## 4. Enumerated Reject Codes
+## 4. Special Matching Rules & Known Limitations
+
+1. **Market Orders on an Empty Book**:
+   - When a MARKET order is submitted and no eligible resting orders exist on the opposite side, zero trades are executed.
+   - Market orders never rest on the book. The entire order quantity is immediately cancelled.
+   - The engine emits a single `ORDER_CANCELLED` event with `remaining_qty: quantity` and `reason: "MARKET_UNFILLED"`. This is a normal terminal state, not an error reject.
+
+2. **Immediate-Or-Cancel (IOC) Partial Fills**:
+   - An IOC order aggressively matches against eligible resting orders up to its specified limit price.
+   - As soon as no eligible price levels remain or available liquidity is exhausted, any unfilled remainder is immediately cancelled.
+   - The engine emits `TRADE_EXECUTED` (and maker `ORDER_FILLED` events where applicable) for each match, followed by `ORDER_CANCELLED` with `reason: "IOC_UNFILLED"` for the unfilled remainder.
+
+3. **Crossing Limit Order that Partially Rests**:
+   - A LIMIT order whose price crosses the inside market matches resting orders at or better than its limit price.
+   - If opposite liquidity is fully exhausted and the aggressor still has remaining quantity, that remaining quantity rests on the book at the aggressor's limit price.
+   - The engine emits `TRADE_EXECUTED` (and maker `ORDER_FILLED`) for each fill, followed by `ORDER_ACCEPTED` for the resting remainder.
+
+4. **Self-Trade / Internal Crossing (Known Limitation)**:
+   - In this educational simulator MVP, participants are allowed to trade against their own resting orders.
+   - When an aggressor crosses an order placed by the same `participant_id`, a trade executes normally with `maker_participant_id === taker_participant_id`.
+   - Self-Trade Prevention (STP) policies are not enforced.
+
+---
+
+## 5. Event Schema & Deterministic Event Ordering
+
+Every command processed by the matching engine emits an array of zero or more discrete event objects.
+
+### Event Types and Field Schemas
+
+1. `TRADE_EXECUTED`:
+   ```json
+   {
+     "event": "TRADE_EXECUTED",
+     "trade_id": 1,
+     "symbol": "BTC-USDT",
+     "price": 100,
+     "quantity": 5,
+     "maker_order_id": 101,
+     "taker_order_id": 102,
+     "maker_participant_id": 1,
+     "taker_participant_id": 2,
+     "taker_side": "BUY",
+     "seq": 42,
+     "ts": 1000
+   }
+   ```
+2. `ORDER_FILLED`:
+   ```json
+   {
+     "event": "ORDER_FILLED",
+     "order_id": 101,
+     "participant_id": 1,
+     "symbol": "BTC-USDT",
+     "side": "SELL",
+     "price": 100,
+     "filled_qty": 5,
+     "seq": 42,
+     "ts": 1000
+   }
+   ```
+3. `ORDER_ACCEPTED`:
+   ```json
+   {
+     "event": "ORDER_ACCEPTED",
+     "order_id": 102,
+     "participant_id": 2,
+     "symbol": "BTC-USDT",
+     "side": "BUY",
+     "price": 100,
+     "quantity": 10,
+     "remaining_qty": 5,
+     "seq": 42,
+     "ts": 1000
+   }
+   ```
+4. `ORDER_CANCELLED`:
+   ```json
+   {
+     "event": "ORDER_CANCELLED",
+     "order_id": 102,
+     "participant_id": 2,
+     "symbol": "BTC-USDT",
+     "side": "BUY",
+     "price": 100,
+     "original_qty": 10,
+     "remaining_qty": 5,
+     "reason": "CLIENT_CANCEL",
+     "seq": 43,
+     "ts": 1001
+   }
+   ```
+5. `ORDER_REJECTED`:
+   ```json
+   {
+     "event": "ORDER_REJECTED",
+     "code": "UNKNOWN_ORDER",
+     "order_id": 999,
+     "participant_id": 2,
+     "seq": 44,
+     "ts": 1002
+   }
+   ```
+
+### Deterministic Event Ordering Within a Command
+
+For a single command, events are emitted in strict chronological order:
+
+1. For each resting order matched during aggressive execution:
+   a. Exactly one `TRADE_EXECUTED` event.
+   b. If the maker order's remaining quantity is reduced to zero: exactly one `ORDER_FILLED` event for the maker order.
+2. After matching loop finishes, for the incoming aggressor order:
+   - If completely filled: exactly one `ORDER_FILLED` event for the taker.
+   - If LIMIT order with remaining quantity: exactly one `ORDER_ACCEPTED` event for the taker with `remaining_qty`.
+   - If IOC order with remaining quantity: exactly one `ORDER_CANCELLED` event with `reason: "IOC_UNFILLED"`.
+   - If MARKET order with remaining quantity (or empty book): exactly one `ORDER_CANCELLED` event with `reason: "MARKET_UNFILLED"`.
+3. For a CANCEL command:
+   - If order is active and owned by participant: exactly one `ORDER_CANCELLED` event with `reason: "CLIENT_CANCEL"`.
+   - If order is unknown: exactly one `ORDER_REJECTED` event with code `UNKNOWN_ORDER`.
+   - If caller is not owner: exactly one `ORDER_REJECTED` event with code `NOT_OWNER`.
+   - If order is already terminal: exactly one `ORDER_REJECTED` event with code `ALREADY_TERMINAL`.
+4. For any command failing validation (tick, lot, non-positive quantity, unknown symbol):
+   - Exactly one `ORDER_REJECTED` event with the corresponding reject code.
+
+---
+
+## 6. Enumerated Reject Codes
 
 When a command fails validation, the engine emits an `ORDER_REJECTED` event with one of the following enumerated codes:
 
@@ -80,7 +206,7 @@ When a command fails validation, the engine emits an `ORDER_REJECTED` event with
 
 ---
 
-## 5. Pure Functional Engine Interface
+## 7. Pure Functional Engine Interface
 
 The core matching engine has zero side effects and zero external dependencies:
 
@@ -92,12 +218,12 @@ Rules enforced inside `src/engine`:
 
 - No I/O operations (no network, no file system, no database).
 - No non-deterministic functions (no `Date.now()`, no `new Date()`, no `Math.random()`, no `crypto.randomUUID()`).
-- Monotonic sequence numbers and nanosecond timestamps are passed as explicit fields of the input `command`.
+- Monotonic sequence numbers and microsecond timestamps are passed as explicit fields of the input `command`.
 - State transitions return a new state reference or update state in-place deterministically while emitting a discrete array of immutable event records.
 
 ---
 
-## 6. Book Data Structure Hypothesis
+## 8. Book Data Structure Hypothesis
 
 The matching book for each symbol is structured as:
 
@@ -120,7 +246,7 @@ This structure is benchmarked against alternatives in Phase 5.
 
 ---
 
-## 7. Engine Invariants
+## 9. Engine Invariants
 
 The following invariants must hold true after every command execution, during replay, and upon verification requests:
 
@@ -140,7 +266,7 @@ The following invariants must hold true after every command execution, during re
 
 ---
 
-## 8. Idempotency Specification
+## 10. Idempotency Specification
 
 A submission of `(participant_id, client_order_id)` that matches an existing journal entry:
 
