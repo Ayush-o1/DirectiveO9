@@ -1,7 +1,8 @@
 import { OrderBook } from './book.js';
 
 export class MatchingEngine {
-  constructor({ instruments = [] } = {}) {
+  constructor({ instruments = [], indexType = 'array' } = {}) {
+    this.indexType = indexType;
     this.instruments = new Map(); // symbol -> { symbol, tick_size, lot_size }
     this.books = new Map(); // symbol -> OrderBook
     this.orders = new Map(); // order_id -> orderRecord
@@ -25,7 +26,10 @@ export class MatchingEngine {
 
     this.instruments.set(symbol, { symbol, tick_size, lot_size });
     if (!this.books.has(symbol)) {
-      this.books.set(symbol, new OrderBook({ symbol, tick_size, lot_size }));
+      this.books.set(
+        symbol,
+        new OrderBook({ symbol, tick_size, lot_size, indexType: this.indexType })
+      );
     }
   }
 

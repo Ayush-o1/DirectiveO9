@@ -79,3 +79,46 @@ export function removePrice(prices, price, isDescending) {
   prices.splice(index, 1);
   return index;
 }
+
+/**
+ * Sorted Array Price Level Index using binary search.
+ * Conforms to the PriceLevelIndex contract.
+ */
+export class SortedArrayPriceIndex extends Array {
+  static get [Symbol.species]() {
+    return Array;
+  }
+
+  constructor(isDescending = false) {
+    if (typeof isDescending === 'number') {
+      super(isDescending);
+      this.isDescending = false;
+    } else {
+      super();
+      this.isDescending = Boolean(isDescending);
+    }
+  }
+
+  peek() {
+    return this.length > 0 ? this[0] : undefined;
+  }
+
+  has(price) {
+    return findPriceIndex(this, price, this.isDescending) !== -1;
+  }
+
+  insert(price) {
+    const prevLen = this.length;
+    insertPrice(this, price, this.isDescending);
+    return this.length > prevLen;
+  }
+
+  remove(price) {
+    return removePrice(this, price, this.isDescending) !== -1;
+  }
+
+  toArray(limit) {
+    const list = Array.from(this);
+    return typeof limit === 'number' && limit > 0 ? list.slice(0, limit) : list;
+  }
+}

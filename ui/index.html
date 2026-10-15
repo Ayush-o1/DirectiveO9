@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DirectiveO9 — Deterministic Matching Engine</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="top-bar">
+      <div class="brand">
+        <span class="logo-dot"></span>
+        <h1>DirectiveO9</h1>
+        <span class="badge">L2 Engine</span>
+      </div>
+      <div class="status-indicators">
+        <div class="indicator" id="sse-indicator">
+          <span class="status-dot"></span>
+          <span id="sse-status">Connecting...</span>
+        </div>
+        <div class="indicator">
+          <span class="label">Sequence:</span>
+          <span class="value mono" id="header-seq">0</span>
+        </div>
+        <div class="indicator">
+          <span class="label">State Hash:</span>
+          <span class="value mono hash-short" id="header-hash" title="State Hash">--------</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="auth-bar">
+      <div class="auth-field">
+        <label for="participant-key">Participant Key:</label>
+        <input
+          type="password"
+          id="participant-key"
+          placeholder="Enter participant key (e.g. part-key-1)"
+          autocomplete="off"
+        />
+      </div>
+      <div class="auth-field">
+        <label for="admin-key">Admin Secret Key:</label>
+        <input
+          type="password"
+          id="admin-key"
+          placeholder="Enter admin key (e.g. admin-secret-key-1)"
+          autocomplete="off"
+        />
+      </div>
+      <div class="auth-note">
+        Keys are typed directly into the browser and transmitted exclusively via HTTP request
+        headers. No keys are embedded.
+      </div>
+    </section>
+
+    <main class="dashboard-grid">
+      <!-- Left Column: Forms and Controls -->
+      <section class="panel panel-controls">
+        <h2>Order Entry</h2>
+        <form id="order-form" class="form">
+          <div class="form-group">
+            <label for="order-symbol">Instrument</label>
+            <select id="order-symbol">
+              <option value="BTC-USDT" selected>BTC-USDT</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Side</label>
+            <div class="side-toggle">
+              <button
+                type="button"
+                class="btn-side btn-buy active"
+                id="btn-side-buy"
+                data-side="BUY"
+              >
+                BUY
+              </button>
+              <button type="button" class="btn-side btn-sell" id="btn-side-sell" data-side="SELL">
+                SELL
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="order-type">Order Type</label>
+            <select id="order-type">
+              <option value="LIMIT" selected>LIMIT (Resting or Aggressive)</option>
+              <option value="MARKET">MARKET (Immediate Sweep)</option>
+              <option value="IOC">IOC (Immediate or Cancel)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="price-group">
+            <label for="order-price">Price (Integer Ticks)</label>
+            <input type="number" id="order-price" value="10000" min="1" step="1" />
+          </div>
+
+          <div class="form-group">
+            <label for="order-qty">Quantity (Integer Lots)</label>
+            <input type="number" id="order-qty" value="10" min="1" step="1" />
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="btn-submit-order">Submit Order</button>
+          <div class="form-feedback" id="order-feedback"></div>
+        </form>
+
+        <hr class="divider" />
+
+        <h2>Order Cancellation</h2>
+        <form id="cancel-form" class="form">
+          <div class="form-group">
+            <label for="cancel-order-id">Order ID</label>
+            <input
+              type="number"
+              id="cancel-order-id"
+              placeholder="Enter active order_id"
+              min="1"
+              required
+            />
+          </div>
+          <button type="submit" class="btn btn-secondary" id="btn-cancel-order">
+            Cancel Order
+          </button>
+          <div class="form-feedback" id="cancel-feedback"></div>
+        </form>
+
+        <hr class="divider" />
+
+        <h2>Verification & Audit</h2>
+        <div class="admin-actions">
+          <button type="button" class="btn btn-admin" id="btn-verify-replay">
+            Verify Replay (Oracle)
+          </button>
+          <button type="button" class="btn btn-outline" id="btn-check-invariants">
+            Check Invariants
+          </button>
+        </div>
+        <div class="audit-result" id="audit-result">
+          Verification idle. Click Verify Replay to audit journal integrity.
+        </div>
+      </section>
+
+      <!-- Center Column: Order Book Depth Ladder -->
+      <section class="panel panel-ladder">
+        <div class="panel-header">
+          <h2>Order Book Ladder</h2>
+          <span class="active-symbol mono" id="ladder-symbol">BTC-USDT</span>
+        </div>
+
+        <div class="ladder-container">
+          <div class="ladder-columns">
+            <span>Price</span>
+            <span>Size</span>
+            <span>Orders</span>
+            <span>Depth</span>
+          </div>
+
+          <!-- Asks (Red, top to bottom: high to low) -->
+          <div class="ladder-asks" id="ladder-asks">
+            <div class="empty-state">No resting asks</div>
+          </div>
+
+          <!-- Spread Row -->
+          <div class="ladder-spread" id="ladder-spread">
+            <span class="spread-label">Spread: <span class="mono" id="spread-value">-</span></span>
+            <span class="spread-mid">Mid: <span class="mono" id="mid-value">-</span></span>
+          </div>
+
+          <!-- Bids (Green, top to bottom: high to low) -->
+          <div class="ladder-bids" id="ladder-bids">
+            <div class="empty-state">No resting bids</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Trade Tape & Event Feed -->
+      <section class="panel panel-tape">
+        <h2>Trade Tape</h2>
+        <div class="tape-table-header">
+          <span>Seq / Time</span>
+          <span>Side</span>
+          <span>Price</span>
+          <span>Qty</span>
+        </div>
+        <div class="tape-rows" id="tape-rows">
+          <div class="empty-state">Awaiting executed trades...</div>
+        </div>
+
+        <hr class="divider" />
+
+        <h2>Event Stream</h2>
+        <div class="event-stream" id="event-stream">
+          <div class="log-entry system">SSE event stream connected.</div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -89,6 +89,20 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
     assert.ok(res.body.instruments.includes('ETH-USDT'));
   });
 
+  it('serves static UI assets from ui/ directory', async () => {
+    const res = await fetch(`${baseUrl}/index.html`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.ok(html.includes('DirectiveO9'));
+    assert.ok(html.includes('Order Book Ladder'));
+
+    const cssRes = await fetch(`${baseUrl}/style.css`);
+    assert.equal(cssRes.status, 200);
+
+    const jsRes = await fetch(`${baseUrl}/app.js`);
+    assert.equal(jsRes.status, 200);
+  });
+
   it('rejects schema-invalid requests with 400 without advancing sequence number', async () => {
     const initialSeq = sequencer.lastSeq;
 

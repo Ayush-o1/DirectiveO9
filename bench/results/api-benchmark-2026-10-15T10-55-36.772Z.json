@@ -1,0 +1,95 @@
+{
+  "benchmark": "api_benchmark",
+  "timestamp": "2026-10-15T10:55:36.772Z",
+  "synchronous_commit": "on",
+  "docker_vm_macos_note": "PostgreSQL runs in Docker VM on macOS; fsync overhead includes virtualization barrier and is not representative of bare-metal production NVMe.",
+  "load_generator_mode": "autocannon fixed-rate",
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "5db9a6d633584755297ec08285230decca682a8a",
+    "git_dirty": true,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "results": [
+    {
+      "configuration": "Unbatched Commit (Batch 1, Timeout 1ms)",
+      "batch_max_size": 1,
+      "batch_timeout_ms": 1,
+      "synchronous_commit": "on",
+      "mode": "autocannon fixed-rate (uncoordinated omission mitigated)",
+      "runs": 5,
+      "throughput_req_sec": {
+        "median": 150,
+        "spread": 0
+      },
+      "latency_p50_ms": {
+        "median": 1,
+        "spread": 0
+      },
+      "latency_p95_ms": {
+        "median": 4.33,
+        "spread": 9
+      },
+      "latency_p99_ms": {
+        "median": 6,
+        "spread": 14
+      }
+    },
+    {
+      "configuration": "Moderate Group Commit (Batch 20, Timeout 5ms)",
+      "batch_max_size": 20,
+      "batch_timeout_ms": 5,
+      "synchronous_commit": "on",
+      "mode": "autocannon fixed-rate (uncoordinated omission mitigated)",
+      "runs": 5,
+      "throughput_req_sec": {
+        "median": 400,
+        "spread": 0
+      },
+      "latency_p50_ms": {
+        "median": 0,
+        "spread": 0
+      },
+      "latency_p95_ms": {
+        "median": 2.33,
+        "spread": 1
+      },
+      "latency_p99_ms": {
+        "median": 3,
+        "spread": 1
+      }
+    },
+    {
+      "configuration": "High Group Commit (Batch 100, Timeout 10ms)",
+      "batch_max_size": 100,
+      "batch_timeout_ms": 10,
+      "synchronous_commit": "on",
+      "mode": "autocannon fixed-rate (uncoordinated omission mitigated)",
+      "runs": 5,
+      "throughput_req_sec": {
+        "median": 400,
+        "spread": 0
+      },
+      "latency_p50_ms": {
+        "median": 0,
+        "spread": 0
+      },
+      "latency_p95_ms": {
+        "median": 2.67,
+        "spread": 1
+      },
+      "latency_p99_ms": {
+        "median": 3,
+        "spread": 2
+      }
+    }
+  ]
+}

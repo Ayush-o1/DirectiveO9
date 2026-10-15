@@ -73,30 +73,31 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
 
 ---
 
-## Phase 4: Deterministic Replay and Crash Recovery
+## Phase 4: Deterministic Replay and Crash Recovery [Completed]
 
 - **Objective**: Implement verifiable state hashing, offline replay verification, invariant audits, and crash recovery.
 - **Deliverables**:
   - Deterministic state projector and SHA-256 canonical state hasher (`src/engine/hash.js`).
   - Standalone replay CLI tool (`scripts/replay.js` and `POST /admin/replay`).
+  - Independent naive reference oracle replay validation (`--oracle`).
   - Online verification endpoint (`GET /admin/verify`) evaluating the 6 invariants against active state.
   - Startup crash-recovery routine replaying the journal from sequence 0.
-  - Chaos simulation script (`scripts/chaos.js`) simulating process termination (`SIGKILL`) under concurrent load, confirming zero acknowledged order loss and bit-for-bit hash reconciliation upon recovery.
+  - Hardened 100-round chaos simulation script (`scripts/chaos.js`) simulating unexpected process termination (`SIGKILL`) under concurrent load with dynamic batch sizing (5..200) and timeouts (1..10ms), confirming zero acknowledged order loss, idempotent duplicate retry resolution, and bit-for-bit hash reconciliation against both engine and independent naive oracle.
 
 ---
 
-## Phase 5: Performance Benchmarks and UI
+## Phase 5: Performance Benchmarks and UI [Completed]
 
-- **Objective**: Profile engine and API throughput, compare alternative data structures, and provide a live web interface.
+- **Objective**: Profile engine and API throughput, compare alternative data structures, and provide a live operator interface.
 - **Deliverables**:
-  - Seeded realistic workload generator (`bench/workload.js`).
-  - Core engine microbenchmark harness (`bench/engine.bench.js`) with JIT warm-up, explicit GC resets, monotonic timing, and latency percentile extraction (p50, p90, p99, p99.9).
-  - End-to-end API load benchmark using `autocannon` (`bench/api.bench.js`).
-  - Empirical benchmark comparing sorted array price levels against Map/Tree variants, recorded in `bench/results/`.
-  - Plain HTML/CSS/JavaScript operator interface (`ui/`):
-    - Visual market depth ladder.
-    - Real-time trade tape.
-    - Replay verification panel with live hash comparison.
+  - Reproducible seeded workload generator (`bench/workload.js`) modeling a moving midpoint with mean reversion and configurable depth.
+  - Hardware and environment telemetry gatherer (`bench/env.js`) capturing CPU model, memory, Node version, OS, git hash, dirty tree flag, and thermal dissipation policies on fanless hardware.
+  - In-memory engine microbenchmark (`bench/engine.bench.js`, `npm run bench:engine`) with V8 warm-up, explicit garbage collection, monotonic `process.hrtime.bigint` timing with measured timer overhead, and p50/p95/p99 latency tracking across shallow and deep books.
+  - Empirical data-structure comparison implementing a pure JavaScript height-balanced AVL tree (`src/engine/avl.js`) behind the identical `PriceLevelIndex` contract, passing 100% of golden fixtures and differential fuzzing against the naive oracle. Documented in ADR 0009 with a keep-or-replace decision.
+  - Fixed-rate API load benchmark (`bench/api.bench.js`, `npm run bench:api`) using `autocannon` to eliminate coordinated omission, sweeping batch configurations (1 vs 20 vs 100) under durable PostgreSQL journaling (`synchronous_commit = on`).
+  - Startup recovery scaling benchmark (`bench/recovery.bench.js`, `npm run bench:recovery`) profiling replay latency across 3 journal sizes and tracking heap memory growth from order registry retention.
+  - Automated benchmark report generator (`scripts/bench-report.js`, `npm run bench:report`) generating `docs/benchmarks.md` strictly from raw JSON telemetry in `bench/results/`.
+  - Operator dashboard in `ui/` (`index.html`, `style.css`, `app.js`) served directly by the Express API, providing an interactive order book depth ladder, live trade tape and event logs over SSE, order entry/cancellation forms, and one-click replay verification. API keys are entered directly in the browser and transmitted via headers without embedding.
 
 ---
 

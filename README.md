@@ -117,12 +117,44 @@ docker compose up -d postgres
 node scripts/seed.js
 ```
 
+### 4. Benchmarking & Empirical Verification
+
+```bash
+# In-memory engine benchmark (sorted array vs AVL tree, shallow vs deep)
+npm run bench:engine
+
+# End-to-end API group-commit benchmark (autocannon fixed rate)
+npm run bench:api
+
+# Startup recovery scaling & heap growth benchmark
+npm run bench:recovery
+
+# Generate docs/benchmarks.md strictly from raw JSON telemetry
+npm run bench:report
+```
+
+### 5. Operator UI Dashboard
+
+Start the API server and navigate to `http://localhost:3000`:
+
+```bash
+npm start
+```
+
+The web interface (`ui/`) serves:
+
+- Real-time order book depth ladder with proportional volume visualization.
+- Live trade tape and sequenced engine event logs over Server-Sent Events (SSE).
+- Order entry and cancellation forms with explicit client-side API key transmission.
+- Live replay verification button executing independent naive oracle audits over `/admin/replay`.
+
 ---
 
 ## Documentation
 
 - [Engine Specification](docs/spec.md)
 - [API Specification](docs/api.md)
+- [Empirical Benchmarks & Verification Report](docs/benchmarks.md)
 - [Development Roadmap](docs/roadmap.md)
 - [Architecture Decision Records](docs/decisions/)
   - [0001: Price-Level Data Structure](docs/decisions/0001-price-level-data-structure.md)
@@ -133,6 +165,7 @@ node scripts/seed.js
   - [0006: Benchmarking Methodology](docs/decisions/0006-benchmarking-methodology.md)
   - [0007: Dependency Rationales](docs/decisions/0007-dependencies-rationale.md)
   - [0008: Plain SQL Migrations Without a Migration Library](docs/decisions/0008-plain-sql-migrations.md)
+  - [0009: Price-Level Index Data Structure Comparison](docs/decisions/0009-price-level-index-data-structure.md)
 
 ---
 
