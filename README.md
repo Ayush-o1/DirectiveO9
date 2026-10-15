@@ -107,8 +107,14 @@ npm run test:coverage
 
 ### 3. Local Database (Docker Compose)
 
+The PostgreSQL container maps container port `5432` to host port `5433` to prevent port collisions with any existing local PostgreSQL service:
+
 ```bash
+# Start PostgreSQL on host port 5433
 docker compose up -d postgres
+
+# Run database migrations and seed default participants/instruments
+node scripts/seed.js
 ```
 
 ---
@@ -126,6 +132,7 @@ docker compose up -d postgres
   - [0005: Property-Based Testing and Differential Verification](docs/decisions/0005-property-based-testing.md)
   - [0006: Benchmarking Methodology](docs/decisions/0006-benchmarking-methodology.md)
   - [0007: Dependency Rationales](docs/decisions/0007-dependencies-rationale.md)
+  - [0008: Plain SQL Migrations Without a Migration Library](docs/decisions/0008-plain-sql-migrations.md)
 
 ---
 

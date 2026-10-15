@@ -18,7 +18,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: directiveo9_test
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -48,9 +48,9 @@ jobs:
         run: npm run test:coverage
         env:
           NODE_ENV: test
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/directiveo9_test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/directiveo9_test
           PGHOST: localhost
-          PGPORT: 5432
+          PGPORT: 5433
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: directiveo9_test

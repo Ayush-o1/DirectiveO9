@@ -16,6 +16,9 @@ export default [
         clearImmediate: 'readonly',
         URL: 'readonly',
         crypto: 'readonly',
+        fetch: 'readonly',
+        AbortController: 'readonly',
+        TextDecoder: 'readonly',
       },
     },
     rules: {

@@ -37,7 +37,7 @@ Requests that mutate order state (`POST /orders`, `DELETE /orders/:id`) require 
   - `200 OK`: Order aggressively filled immediately (terminal `FILLED`), or idempotent return of an existing submission.
   - `400 Bad Request`: Validation failure (enumerated reject code).
   - `401 Unauthorized`: Missing or invalid participant credentials.
-  - `429 Too Many Requests`: Sequencer queue capacity exceeded (`QUEUE_FULL`).
+  - `503 Service Unavailable`: Sequencer queue capacity exceeded (`QUEUE_FULL`).
 
 ---
 
