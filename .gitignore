@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+.c8_output/
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

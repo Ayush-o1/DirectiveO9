@@ -1,0 +1,32 @@
+{
+  "name": "directiveo9",
+  "version": "0.1.0",
+  "description": "Deterministic limit-order-book matching engine with durable command journal and verifiable replay",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/**/*.test.js",
+    "test:coverage": "c8 --reporter=text --reporter=lcov node --test test/**/*.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "bench": "node bench/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0",
+    "c8": "^10.1.3",
+    "eslint": "^9.18.0",
+    "fast-check": "^3.23.2",
+    "prettier": "^3.4.2"
+  },
+  "license": "MIT"
+}
