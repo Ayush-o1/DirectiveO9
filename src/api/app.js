@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createAuthMiddleware, createAdminAuthMiddleware, hashApiKey } from './auth.js';
 import {
   createOrderSchema,
@@ -10,9 +12,13 @@ import {
 import { computeStateHash } from '../engine/hash.js';
 import { replayJournal } from '../sequencer/replay.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export function createApp({ sequencer, pool, adminKey }) {
   const app = express();
   app.use(express.json());
+  app.use(express.static(path.resolve(__dirname, '../../ui')));
 
   const auth = createAuthMiddleware(pool);
   const adminAuth = createAdminAuthMiddleware(adminKey);

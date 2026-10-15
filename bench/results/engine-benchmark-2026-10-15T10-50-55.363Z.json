@@ -1,0 +1,172 @@
+{
+  "benchmark": "engine_benchmark",
+  "timestamp": "2026-10-15T10:50:55.364Z",
+  "timer_overhead_ns": {
+    "count": 100000,
+    "min": 0,
+    "max": 19917,
+    "mean": 16.43,
+    "median": 0,
+    "p50": 0,
+    "p95": 42,
+    "p99": 42,
+    "spread": 19917,
+    "stddev": 86.19
+  },
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "5db9a6d633584755297ec08285230decca682a8a",
+    "git_dirty": true,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "results": [
+    {
+      "scenario": "Shallow Book (Depth 10)",
+      "data_structure": "sorted-array",
+      "book_depth": 10,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1559584,
+        "min": 1392444,
+        "max": 1744983,
+        "spread": 352538
+      },
+      "latency_p50_ns": {
+        "median": 375,
+        "min": 333,
+        "max": 375,
+        "spread": 42
+      },
+      "latency_p95_ns": {
+        "median": 1750,
+        "min": 1667,
+        "max": 1834,
+        "spread": 167
+      },
+      "latency_p99_ns": {
+        "median": 2667,
+        "min": 2542,
+        "max": 2792,
+        "spread": 250
+      },
+      "latency_mean_ns": {
+        "median": 611.48,
+        "spread": 146.39
+      }
+    },
+    {
+      "scenario": "Shallow Book (Depth 10)",
+      "data_structure": "avl-tree",
+      "book_depth": 10,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 2025994,
+        "min": 1960842,
+        "max": 2096627,
+        "spread": 135785
+      },
+      "latency_p50_ns": {
+        "median": 375,
+        "min": 334,
+        "max": 375,
+        "spread": 41
+      },
+      "latency_p95_ns": {
+        "median": 1167,
+        "min": 1083,
+        "max": 1250,
+        "spread": 167
+      },
+      "latency_p99_ns": {
+        "median": 1875,
+        "min": 1708,
+        "max": 2000,
+        "spread": 292
+      },
+      "latency_mean_ns": {
+        "median": 464.24,
+        "spread": 23.7
+      }
+    },
+    {
+      "scenario": "Deep Book (Depth 2000)",
+      "data_structure": "sorted-array",
+      "book_depth": 2000,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 98544,
+        "min": 96809,
+        "max": 99230,
+        "spread": 2421
+      },
+      "latency_p50_ns": {
+        "median": 1208,
+        "min": 1125,
+        "max": 1291,
+        "spread": 166
+      },
+      "latency_p95_ns": {
+        "median": 31917,
+        "min": 31583,
+        "max": 32625,
+        "spread": 1042
+      },
+      "latency_p99_ns": {
+        "median": 61458,
+        "min": 61000.42,
+        "max": 63541.01,
+        "spread": 2540.59
+      },
+      "latency_mean_ns": {
+        "median": 10118.08,
+        "spread": 252.44
+      }
+    },
+    {
+      "scenario": "Deep Book (Depth 2000)",
+      "data_structure": "avl-tree",
+      "book_depth": 2000,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1646280,
+        "min": 1525068,
+        "max": 1737423,
+        "spread": 212355
+      },
+      "latency_p50_ns": {
+        "median": 458,
+        "min": 458,
+        "max": 500,
+        "spread": 42
+      },
+      "latency_p95_ns": {
+        "median": 1208,
+        "min": 1167,
+        "max": 1250,
+        "spread": 83
+      },
+      "latency_p99_ns": {
+        "median": 2042.41,
+        "min": 1875,
+        "max": 2167,
+        "spread": 292
+      },
+      "latency_mean_ns": {
+        "median": 577.38,
+        "spread": 79.5
+      }
+    }
+  ]
+}

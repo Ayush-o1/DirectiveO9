@@ -1,0 +1,77 @@
+{
+  "benchmark": "recovery_benchmark",
+  "timestamp": "2026-10-15T10:55:46.056Z",
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "5db9a6d633584755297ec08285230decca682a8a",
+    "git_dirty": true,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "results": [
+    {
+      "journal_size": 1000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 0.78,
+        "spread": 1.15
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1277955,
+        "spread": 1064108
+      },
+      "heap_growth_mb": {
+        "median": 0.81,
+        "spread": 1.43
+      },
+      "order_registry_size": 884,
+      "resting_orders_on_book": 243,
+      "canonical_state_hash": "a1a7354f132516718bbe4c85e1490e12f362acbcbd088c4c13c51ce02ce55416"
+    },
+    {
+      "journal_size": 5000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 3.69,
+        "spread": 1.47
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1355488,
+        "spread": 466623
+      },
+      "heap_growth_mb": {
+        "median": 3.94,
+        "spread": 4.21
+      },
+      "order_registry_size": 4519,
+      "resting_orders_on_book": 1334,
+      "canonical_state_hash": "85e67c9f14ea1d60431a7a458813b12713d83c96f6aba93e726c68ec87af555a"
+    },
+    {
+      "journal_size": 20000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 13.21,
+        "spread": 1.45
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1514563,
+        "spread": 159643
+      },
+      "heap_growth_mb": {
+        "median": 14.94,
+        "spread": 14.94
+      },
+      "order_registry_size": 18063,
+      "resting_orders_on_book": 5135,
+      "canonical_state_hash": "f3a88da05b241ebadc716b660d04b4fec1f2e62f64d5dda3d4999e0d10e11a8f"
+    }
+  ]
+}

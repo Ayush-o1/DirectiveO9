@@ -19,7 +19,10 @@
     "format:check": "prettier --check .",
     "db:migrate": "node src/db/migrator.js",
     "db:seed": "node scripts/seed.js",
-    "bench": "node bench/index.js"
+    "bench:engine": "node --expose-gc bench/engine.bench.js",
+    "bench:api": "node bench/api.bench.js",
+    "bench:recovery": "node bench/recovery.bench.js",
+    "bench:report": "node scripts/bench-report.js"
   },
   "dependencies": {
     "express": "^4.21.2",

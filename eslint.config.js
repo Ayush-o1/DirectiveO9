@@ -19,6 +19,7 @@ export default [
         fetch: 'readonly',
         AbortController: 'readonly',
         TextDecoder: 'readonly',
+        globalThis: 'readonly',
       },
     },
     rules: {
@@ -29,6 +30,17 @@ export default [
       'no-duplicate-imports': 'error',
       'prefer-const': 'error',
       eqeqeq: ['error', 'always'],
+    },
+  },
+  {
+    files: ['ui/**/*.js'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        window: 'readonly',
+        EventSource: 'readonly',
+        fetch: 'readonly',
+      },
     },
   },
   {

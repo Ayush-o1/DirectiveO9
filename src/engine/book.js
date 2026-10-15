@@ -1,8 +1,9 @@
 import { OrderNode, LevelQueue } from './queue.js';
-import { insertPrice, removePrice } from './level.js';
+import { SortedArrayPriceIndex } from './level.js';
+import { AvlTreePriceIndex } from './avl.js';
 
 export class OrderBook {
-  constructor({ symbol, tick_size = 1, lot_size = 1 }) {
+  constructor({ symbol, tick_size = 1, lot_size = 1, indexType = 'array' }) {
     if (!symbol || typeof symbol !== 'string') {
       throw new Error('Symbol must be a non-empty string');
     }
@@ -16,9 +17,15 @@ export class OrderBook {
     this.symbol = symbol;
     this.tick_size = tick_size;
     this.lot_size = lot_size;
+    this.indexType = indexType;
 
-    this.bids = []; // Sorted descending (highest price first)
-    this.asks = []; // Sorted ascending (lowest price first)
+    if (indexType === 'avl' || indexType === 'tree') {
+      this.bids = new AvlTreePriceIndex(true);
+      this.asks = new AvlTreePriceIndex(false);
+    } else {
+      this.bids = new SortedArrayPriceIndex(true);
+      this.asks = new SortedArrayPriceIndex(false);
+    }
 
     this.levels = new Map(); // price -> LevelQueue
     this.orders = new Map(); // order_id -> { node, side }
@@ -59,7 +66,7 @@ export class OrderBook {
     if (!level) {
       level = new LevelQueue(price);
       this.levels.set(price, level);
-      insertPrice(prices, price, isBuy);
+      prices.insert(price);
     }
 
     const node = new OrderNode({
@@ -96,7 +103,7 @@ export class OrderBook {
 
     if (level.isEmpty()) {
       this.levels.delete(node.price);
-      removePrice(prices, node.price, isBuy);
+      prices.remove(node.price);
     }
 
     this.orders.delete(order_id);
@@ -143,27 +150,29 @@ export class OrderBook {
     const safeDepth = Math.max(1, Math.min(depth, 500));
 
     const bidsDepth = [];
-    const limitBids = Math.min(this.bids.length, safeDepth);
-    for (let i = 0; i < limitBids; i++) {
-      const price = this.bids[i];
+    const bidsPrices = this.bids.toArray(safeDepth);
+    for (const price of bidsPrices) {
       const level = this.levels.get(price);
-      bidsDepth.push({
-        price,
-        quantity: level.total_volume,
-        order_count: level.order_count,
-      });
+      if (level) {
+        bidsDepth.push({
+          price,
+          quantity: level.total_volume,
+          order_count: level.order_count,
+        });
+      }
     }
 
     const asksDepth = [];
-    const limitAsks = Math.min(this.asks.length, safeDepth);
-    for (let i = 0; i < limitAsks; i++) {
-      const price = this.asks[i];
+    const asksPrices = this.asks.toArray(safeDepth);
+    for (const price of asksPrices) {
       const level = this.levels.get(price);
-      asksDepth.push({
-        price,
-        quantity: level.total_volume,
-        order_count: level.order_count,
-      });
+      if (level) {
+        asksDepth.push({
+          price,
+          quantity: level.total_volume,
+          order_count: level.order_count,
+        });
+      }
     }
 
     return {
@@ -203,21 +212,29 @@ export class OrderBook {
     }
 
     // Invariant: Bids strictly descending
-    for (let i = 0; i < this.bids.length - 1; i++) {
-      if (this.bids[i] <= this.bids[i + 1]) {
+    let prevBid = null;
+    let bidIdx = 0;
+    for (const bidPrice of this.bids) {
+      if (prevBid !== null && bidPrice >= prevBid) {
         throw new Error(
-          `Invariant violation: bids not strictly descending at index ${i}: ${this.bids[i]} <= ${this.bids[i + 1]}`
+          `Invariant violation: bids not strictly descending at index ${bidIdx}: ${prevBid} <= ${bidPrice}`
         );
       }
+      prevBid = bidPrice;
+      bidIdx++;
     }
 
     // Invariant: Asks strictly ascending
-    for (let i = 0; i < this.asks.length - 1; i++) {
-      if (this.asks[i] >= this.asks[i + 1]) {
+    let prevAsk = null;
+    let askIdx = 0;
+    for (const askPrice of this.asks) {
+      if (prevAsk !== null && askPrice <= prevAsk) {
         throw new Error(
-          `Invariant violation: asks not strictly ascending at index ${i}: ${this.asks[i]} >= ${this.asks[i + 1]}`
+          `Invariant violation: asks not strictly ascending at index ${askIdx}: ${prevAsk} >= ${askPrice}`
         );
       }
+      prevAsk = askPrice;
+      askIdx++;
     }
 
     // Invariant 2 & 3: Order presence, single location, positive quantity
