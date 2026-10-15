@@ -5,7 +5,7 @@ import { Sequencer } from './sequencer/sequencer.js';
 import { createApp } from './api/app.js';
 
 export function getVersion() {
-  return '0.1.0';
+  return '1.0.0';
 }
 
 export * from './engine/index.js';

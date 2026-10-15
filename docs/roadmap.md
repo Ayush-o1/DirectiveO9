@@ -108,6 +108,8 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
   - Comprehensive `README.md` with architecture diagrams, schema ER diagrams, setup instructions, and reproducible benchmark commands.
   - Verified benchmark figures linked directly to timestamped results in `bench/results/`.
   - API documentation in `docs/api.md`.
+  - System architecture documentation in `docs/architecture.md`.
+  - Documentation Plan Placeholder: UI Screenshots (Reserved for operator dashboard views: screenshot-1-depth-ladder.png, screenshot-2-trade-tape.png, to be included upon user submission).
   - Tagging of release `v1.0.0` on `main`.
 
 ---

@@ -1,13 +1,18 @@
 {
   "name": "directiveo9",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Deterministic limit-order-book matching engine with durable command journal and verifiable replay",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ayush-o1/DirectiveO9.git"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
     "start": "node src/index.js",
+    "demo": "node scripts/demo.js",
     "test": "node --test --test-concurrency=1",
     "test:coverage": "c8 --reporter=text --reporter=lcov node --test --test-concurrency=1",
     "test:diff:long": "LONG_DIFF=true node --test test/differential.test.js",
