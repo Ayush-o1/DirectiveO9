@@ -18,6 +18,7 @@
     "test:diff:long": "LONG_DIFF=true node --test test/differential.test.js",
     "replay": "node scripts/replay.js",
     "chaos:kill": "node scripts/chaos.js",
+    "mutate": "node scripts/mutate.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

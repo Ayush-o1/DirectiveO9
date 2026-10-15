@@ -28,16 +28,16 @@ An initial benchmark showed `sorted-array` collapsing from 1,559,584 ops/s at 10
 4. **Level Churn Workload**: In the standard benchmark workload, 45% of commands are maker limits. On deep books (depth $\ge 500$), virtually every maker order touches an empty price level, and crossing market sweeps or cancellations exhaust levels. Price level creation and deletion operations account for 45.06% of commands at depth 500 and 72.84% of commands at depth 5,000.
 5. **Fix**: Refactoring `SortedArrayPriceIndex` to encapsulate a plain array (`this.prices = []`) restored V8's contiguous memory copy path, increasing deep-book throughput by over 17x.
 
-## Empirical Benchmark Results (Before vs After Artifact Fix)
+### Like-for-Like Slowdown Measurement (Commit 69b25d2 vs HEAD)
 
-### Before Fix (Array Subclass Artifact)
+Source artifact: `bench/results/subclass-comparison-2026-10-15T12-34-46-783Z.json` (Apple M4, 10 cores, Node v24.21.0, same seed, same 25,000 commands/run, 5 repetitions):
 
-| Scenario                | Data Structure            | Throughput (median ops/s) | p50 Latency (ns) | p95 Latency (ns) |
-| :---------------------- | :------------------------ | :------------------------ | :--------------- | :--------------- |
-| Shallow Book (Depth 10) | `sorted-array` (subclass) | 1,559,584                 | 375 ns           | 1,750 ns         |
-| Shallow Book (Depth 10) | `avl-tree`                | 2,025,994                 | 375 ns           | 1,167 ns         |
-| Deep Book (Depth 2,000) | `sorted-array` (subclass) | 98,544                    | 1,208 ns         | 31,917 ns        |
-| Deep Book (Depth 2,000) | `avl-tree`                | 1,646,280                 | 458 ns           | 1,208 ns         |
+| Book Depth | Implementation                    | Throughput (median ops/s) | Spread (ops/s) | p50 Latency (ns) | p95 Latency (ns) | p99 Latency (ns) |
+| :--------- | :-------------------------------- | :------------------------ | :------------- | :--------------- | :--------------- | :--------------- |
+| **500**    | Array-Subclass (commit `69b25d2`) | 180,973                   | 27,372         | 583 ns           | 24,917 ns        | 37,084 ns        |
+| **500**    | Plain Array (HEAD)                | 1,264,113                 | 955,445        | 625 ns           | 1,500 ns         | 2,375 ns         |
+| **5,000**  | Array-Subclass (commit `69b25d2`) | 39,804                    | 3,006          | 10,333 ns        | 80,667 ns        | 148,041 ns       |
+| **5,000**  | Plain Array (HEAD)                | 1,019,865                 | 623,493        | 791 ns           | 1,834 ns         | 2,750 ns         |
 
 ### After Fix (Plain Array Encapsulation, 5 repetitions, 25,000 commands/run)
 

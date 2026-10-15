@@ -1,7 +1,7 @@
 import { OrderBook } from './book.js';
 
 export class MatchingEngine {
-  constructor({ instruments = [], indexType = 'array' } = {}) {
+  constructor({ instruments = [], indexType = process.env.INDEX_TYPE || 'array' } = {}) {
     this.indexType = indexType;
     this.instruments = new Map(); // symbol -> { symbol, tick_size, lot_size }
     this.books = new Map(); // symbol -> OrderBook

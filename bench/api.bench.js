@@ -29,7 +29,7 @@ async function runAutocannonTest({ port, apiKey, durationSec = 4, overallRate, c
       type: 'LIMIT',
       price,
       quantity: 5,
-      client_order_id: `bench-api-${Date.now()}-${counter}`,
+      client_order_id: `bench-api-${Date.now()}-${counter}-${Math.random()}`,
     });
   };
 
@@ -76,6 +76,7 @@ async function benchmarkConfig({
   apiKey,
   batchMaxSize,
   batchTimeoutMs,
+  maxQueueSize = 1000,
   overallRate,
   connections = 8,
   repetitions = 5,
@@ -83,6 +84,8 @@ async function benchmarkConfig({
 }) {
   const achievedRates = [];
   const totalRequests = [];
+  const status2xxCounts = [];
+  const status5xxCounts = [];
   const non2xxCounts = [];
   const errorCounts = [];
   const p50s = [];
@@ -94,6 +97,7 @@ async function benchmarkConfig({
       pool,
       batchMaxSize,
       batchTimeoutMs,
+      maxQueueSize,
     });
     await sequencer.init();
 
@@ -118,6 +122,8 @@ async function benchmarkConfig({
 
       achievedRates.push(res.requests.average);
       totalRequests.push(res.requests.total);
+      status2xxCounts.push(res['2xx'] || 0);
+      status5xxCounts.push(res['5xx'] || 0);
       non2xxCounts.push(res.non2xx || 0);
       errorCounts.push(res.errors || 0);
       p50s.push(res.latency.p50);
@@ -126,7 +132,7 @@ async function benchmarkConfig({
       p99s.push(res.latency.p99);
 
       process.stdout.write(
-        `  Run ${r + 1}/${repetitions}: achieved = ${Math.round(res.requests.average)} req/s | total reqs = ${res.requests.total} | non-2xx = ${res.non2xx || 0} | errors = ${res.errors || 0} | p50 = ${res.latency.p50} ms | p95 = ${p95Estimate} ms\n`
+        `  Run ${r + 1}/${repetitions}: achieved = ${Math.round(res.requests.average)} req/s | 2xx = ${res['2xx'] || 0} | 5xx = ${res['5xx'] || 0} | non-2xx = ${res.non2xx || 0} | errors = ${res.errors || 0} | p50 = ${res.latency.p50} ms | p95 = ${p95Estimate} ms\n`
       );
     } finally {
       server.closeAllConnections?.();
@@ -138,6 +144,8 @@ async function benchmarkConfig({
   return {
     achievedRate: computeStats(achievedRates),
     totalRequests: computeStats(totalRequests),
+    status2xx: computeStats(status2xxCounts),
+    status5xx: computeStats(status5xxCounts),
     non2xx: computeStats(non2xxCounts),
     errors: computeStats(errorCounts),
     p50: computeStats(p50s),
@@ -171,42 +179,60 @@ async function main() {
 
   const configurations = [
     {
-      name: 'Unbatched Commit (Batch 1, Timeout 1ms)',
-      batchMaxSize: 1,
-      batchTimeoutMs: 1,
-      overallRate: 150,
-      connections: 8,
-      mode: 'fixed-rate (offered 150 req/s)',
-      isCapacityRun: false,
-    },
-    {
-      name: 'Moderate Group Commit (Batch 20, Timeout 5ms)',
+      name: 'Fixed-Rate (Offered 100 req/s, Batch 20, Timeout 5ms)',
       batchMaxSize: 20,
       batchTimeoutMs: 5,
-      overallRate: 400,
+      maxQueueSize: 1000,
+      overallRate: 100,
       connections: 8,
-      mode: 'fixed-rate (offered 400 req/s)',
+      mode: 'fixed-rate',
       isCapacityRun: false,
     },
     {
-      name: 'High Group Commit (Batch 100, Timeout 10ms)',
+      name: 'Fixed-Rate (Offered 500 req/s, Batch 100, Timeout 10ms)',
       batchMaxSize: 100,
       batchTimeoutMs: 10,
-      overallRate: 400,
+      maxQueueSize: 1000,
+      overallRate: 500,
       connections: 8,
-      mode: 'fixed-rate (offered 400 req/s)',
+      mode: 'fixed-rate',
       isCapacityRun: false,
     },
     {
-      name: 'System Capacity Run (Unconstrained Max-Rate, Batch 100, Timeout 10ms)',
-      batchMaxSize: 100,
-      batchTimeoutMs: 10,
-      overallRate: null, // Unconstrained to find saturation limit
+      name: 'Max-Rate Unbatched Comparison (Batch 1, Timeout 1ms, Conn 16)',
+      batchMaxSize: 1,
+      batchTimeoutMs: 1,
+      maxQueueSize: 1000,
+      overallRate: null, // Unconstrained
       connections: 16,
-      mode: 'unconstrained max-rate (capacity measurement)',
+      mode: 'unconstrained max-rate (group-commit comparison)',
       isCapacityRun: true,
+      groupCommitCompare: 'batch_size_1',
+    },
+    {
+      name: 'Max-Rate Group-Commit Comparison (Batch 100, Timeout 10ms, Conn 16)',
+      batchMaxSize: 100,
+      batchTimeoutMs: 10,
+      maxQueueSize: 1000,
+      overallRate: null, // Unconstrained
+      connections: 16,
+      mode: 'unconstrained max-rate (group-commit comparison)',
+      isCapacityRun: true,
+      groupCommitCompare: 'batch_size_100',
+    },
+    {
+      name: 'Over-Capacity Saturation Test (Queue Limit 50, Conn 80)',
+      batchMaxSize: 10,
+      batchTimeoutMs: 15,
+      maxQueueSize: 50,
+      overallRate: null,
+      connections: 80,
+      durationSec: 3,
+      mode: 'over-capacity test (queue limit 50, 80 concurrent connections)',
+      isCapacityRun: false,
+      isOverCapacityTest: true,
       queueFullNote:
-        'Ingress queue bounded by queueCapacity; returns 503 QUEUE_FULL on saturation.',
+        'Saturates ingress queue (limit 50 with 80 concurrent connections) to measure 503 QUEUE_FULL rejection behavior with zero socket errors.',
     },
   ];
 
@@ -219,18 +245,21 @@ async function main() {
       apiKey,
       batchMaxSize: cfg.batchMaxSize,
       batchTimeoutMs: cfg.batchTimeoutMs,
+      maxQueueSize: cfg.maxQueueSize,
       overallRate: cfg.overallRate,
       connections: cfg.connections,
       repetitions: REPETITIONS,
-      durationSec: 4,
+      durationSec: cfg.durationSec || 4,
     });
 
     results.push({
       configuration: cfg.name,
       batch_max_size: cfg.batchMaxSize,
       batch_timeout_ms: cfg.batchTimeoutMs,
+      configured_queue_limit: cfg.maxQueueSize,
       mode: cfg.mode,
       is_capacity_run: cfg.isCapacityRun,
+      is_over_capacity_test: Boolean(cfg.isOverCapacityTest),
       queue_full_note: cfg.queueFullNote || null,
       offered_rate_req_sec: cfg.overallRate ?? 'unconstrained',
       achieved_rate_req_sec: {
@@ -240,6 +269,14 @@ async function main() {
       total_requests: {
         median: Math.round(measured.totalRequests.median),
         spread: Math.round(measured.totalRequests.spread),
+      },
+      status_2xx_count: {
+        median: Math.round(measured.status2xx.median),
+        max: Math.round(measured.status2xx.max),
+      },
+      status_503_count: {
+        median: Math.round(measured.status5xx.median),
+        max: Math.round(measured.status5xx.max),
       },
       non_2xx_count: {
         median: Math.round(measured.non2xx.median),
@@ -273,9 +310,12 @@ async function main() {
     results.map(r => ({
       Configuration: r.configuration,
       'Batch Size': r.batch_max_size,
-      'Offered Rate': r.offered_rate_req_sec,
-      'Achieved Rate (req/s)': r.achieved_rate_req_sec.median,
+      'Queue Limit': r.configured_queue_limit,
+      'Offered (req/s)': r.offered_rate_req_sec,
+      'Achieved (req/s)': r.achieved_rate_req_sec.median,
       'Total Reqs': r.total_requests.median,
+      '2xx (OK)': r.status_2xx_count.median,
+      '503 QUEUE_FULL': r.status_503_count.median,
       'Non-2xx': r.non_2xx_count.median,
       Errors: r.error_count.median,
       'p50 (ms)': r.latency_p50_ms.median,
@@ -291,7 +331,7 @@ async function main() {
     synchronous_commit: synchronousCommit,
     docker_vm_macos_note:
       'PostgreSQL runs in Docker VM on macOS; fsync overhead includes virtualization barrier and is not representative of bare-metal production NVMe.',
-    load_generator_mode: 'autocannon (fixed-rate offered load & unconstrained max-rate capacity)',
+    load_generator_mode: 'autocannon (fixed-rate offered load, max-rate capacity & over-capacity)',
     environment: env,
     results,
   };

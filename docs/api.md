@@ -174,14 +174,19 @@ Requests that mutate order state (`POST /orders`, `DELETE /orders/:id`) require 
 
 ---
 
-### 9. Health & System Metrics
+### 9. Health Check
 
-- **`GET /health`**: Returns engine status, database connectivity, and sequencer queue depth.
-- **`GET /metrics`**: Returns Prometheus-compatible / JSON operational metrics:
-  - Total commands processed.
-  - Group commit batch latency percentiles.
-  - Active resting order count.
-  - Memory consumption (heap used / total).
+- **`GET /health`**: Returns engine status, database connectivity, and sequencer queue depth:
+  ```json
+  {
+    "status": "healthy",
+    "db": "connected",
+    "engine": {
+      "symbols": ["BTC-USDT", "ETH-USDT"],
+      "queue_depth": 0
+    }
+  }
+  ```
 
 ---
 

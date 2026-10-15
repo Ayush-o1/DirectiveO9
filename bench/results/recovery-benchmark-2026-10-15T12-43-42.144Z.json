@@ -1,0 +1,195 @@
+{
+  "benchmark": "recovery_benchmark",
+  "timestamp": "2026-10-15T12:43:42.145Z",
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "8473e2c2fdf8c6e895f313fb8696cb107fa1f6c4",
+    "git_dirty": true,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "in_memory_results": [
+    {
+      "benchmark_type": "in_memory_engine_replay",
+      "journal_size": 1000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 0.6,
+        "spread": 1.5
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1673640,
+        "spread": 2189195
+      },
+      "heap_growth_mb": {
+        "median": 0.77,
+        "spread": 2.26
+      },
+      "order_registry_size": 884,
+      "resting_orders_on_book": 243,
+      "canonical_state_hash": "a1a7354f132516718bbe4c85e1490e12f362acbcbd088c4c13c51ce02ce55416"
+    },
+    {
+      "benchmark_type": "in_memory_engine_replay",
+      "journal_size": 5000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 2.88,
+        "spread": 2.43
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1733503,
+        "spread": 1532698
+      },
+      "heap_growth_mb": {
+        "median": 3.93,
+        "spread": 4.45
+      },
+      "order_registry_size": 4519,
+      "resting_orders_on_book": 1334,
+      "canonical_state_hash": "85e67c9f14ea1d60431a7a458813b12713d83c96f6aba93e726c68ec87af555a"
+    },
+    {
+      "benchmark_type": "in_memory_engine_replay",
+      "journal_size": 20000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 7.92,
+        "spread": 3.95
+      },
+      "replay_throughput_ops_sec": {
+        "median": 2523792,
+        "spread": 1113608
+      },
+      "heap_growth_mb": {
+        "median": 14.94,
+        "spread": 14.95
+      },
+      "order_registry_size": 18063,
+      "resting_orders_on_book": 5135,
+      "canonical_state_hash": "f3a88da05b241ebadc716b660d04b4fec1f2e62f64d5dda3d4999e0d10e11a8f"
+    }
+  ],
+  "full_startup_results": [
+    {
+      "benchmark_type": "full_startup_recovery",
+      "journal_size": 1000,
+      "runs": 5,
+      "recovery_duration_ms": {
+        "median": 17.53,
+        "spread": 4.72
+      },
+      "effective_throughput_ops_sec": {
+        "median": 57035,
+        "spread": 13838
+      },
+      "events_verified": 1692,
+      "trades_verified": 442,
+      "canonical_state_hash": "1255d74109a5a8c6dd42b5de49235f2e1ffcd69171ed11f5ab692d063540dc8e",
+      "divergences": 0
+    },
+    {
+      "benchmark_type": "full_startup_recovery",
+      "journal_size": 5000,
+      "runs": 5,
+      "recovery_duration_ms": {
+        "median": 72.69,
+        "spread": 2.47
+      },
+      "effective_throughput_ops_sec": {
+        "median": 68781,
+        "spread": 2335
+      },
+      "events_verified": 8604,
+      "trades_verified": 2273,
+      "canonical_state_hash": "f4a7944f3b5884b673bd886ac11efa201a00d3d8b48967c17c697c35446a1bc1",
+      "divergences": 0
+    },
+    {
+      "benchmark_type": "full_startup_recovery",
+      "journal_size": 20000,
+      "runs": 5,
+      "recovery_duration_ms": {
+        "median": 282.7,
+        "spread": 44.82
+      },
+      "effective_throughput_ops_sec": {
+        "median": 70746,
+        "spread": 11523
+      },
+      "events_verified": 34672,
+      "trades_verified": 9348,
+      "canonical_state_hash": "ee14d4337580eafb2179b3639f53861d9b432a00a27ee3646eed5f0a326e17e6",
+      "divergences": 0
+    }
+  ],
+  "results": [
+    {
+      "benchmark_type": "in_memory_engine_replay",
+      "journal_size": 1000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 0.6,
+        "spread": 1.5
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1673640,
+        "spread": 2189195
+      },
+      "heap_growth_mb": {
+        "median": 0.77,
+        "spread": 2.26
+      },
+      "order_registry_size": 884,
+      "resting_orders_on_book": 243,
+      "canonical_state_hash": "a1a7354f132516718bbe4c85e1490e12f362acbcbd088c4c13c51ce02ce55416"
+    },
+    {
+      "benchmark_type": "in_memory_engine_replay",
+      "journal_size": 5000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 2.88,
+        "spread": 2.43
+      },
+      "replay_throughput_ops_sec": {
+        "median": 1733503,
+        "spread": 1532698
+      },
+      "heap_growth_mb": {
+        "median": 3.93,
+        "spread": 4.45
+      },
+      "order_registry_size": 4519,
+      "resting_orders_on_book": 1334,
+      "canonical_state_hash": "85e67c9f14ea1d60431a7a458813b12713d83c96f6aba93e726c68ec87af555a"
+    },
+    {
+      "benchmark_type": "in_memory_engine_replay",
+      "journal_size": 20000,
+      "runs": 5,
+      "replay_duration_ms": {
+        "median": 7.92,
+        "spread": 3.95
+      },
+      "replay_throughput_ops_sec": {
+        "median": 2523792,
+        "spread": 1113608
+      },
+      "heap_growth_mb": {
+        "median": 14.94,
+        "spread": 14.95
+      },
+      "order_registry_size": 18063,
+      "resting_orders_on_book": 5135,
+      "canonical_state_hash": "f3a88da05b241ebadc716b660d04b4fec1f2e62f64d5dda3d4999e0d10e11a8f"
+    }
+  ]
+}

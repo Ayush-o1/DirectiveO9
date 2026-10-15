@@ -1,0 +1,144 @@
+{
+  "benchmark": "subclass_vs_plain_array",
+  "timestamp": "2026-10-15T12:34:46.784Z",
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "8473e2c2fdf8c6e895f313fb8696cb107fa1f6c4",
+    "git_dirty": true,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "results": [
+    {
+      "implementation": "Array-Subclass (commit 69b25d2)",
+      "type": "subclass",
+      "book_depth": 500,
+      "command_count": 25000,
+      "repetitions": 5,
+      "throughput_ops_sec": {
+        "median": 180973,
+        "min": 176721,
+        "max": 204093,
+        "spread": 27372
+      },
+      "latency_p50_ns": {
+        "median": 583,
+        "min": 416,
+        "max": 667,
+        "spread": 251
+      },
+      "latency_p95_ns": {
+        "median": 24917,
+        "min": 22041,
+        "max": 25291,
+        "spread": 3250
+      },
+      "latency_p99_ns": {
+        "median": 37084,
+        "min": 32542,
+        "max": 37250,
+        "spread": 4708
+      }
+    },
+    {
+      "implementation": "Plain Array (HEAD)",
+      "type": "plain",
+      "book_depth": 500,
+      "command_count": 25000,
+      "repetitions": 5,
+      "throughput_ops_sec": {
+        "median": 1264113,
+        "min": 1100342,
+        "max": 2055787,
+        "spread": 955445
+      },
+      "latency_p50_ns": {
+        "median": 625,
+        "min": 334,
+        "max": 750,
+        "spread": 416
+      },
+      "latency_p95_ns": {
+        "median": 1500,
+        "min": 834,
+        "max": 1625,
+        "spread": 791
+      },
+      "latency_p99_ns": {
+        "median": 2375,
+        "min": 1250,
+        "max": 2625,
+        "spread": 1375
+      }
+    },
+    {
+      "implementation": "Array-Subclass (commit 69b25d2)",
+      "type": "subclass",
+      "book_depth": 5000,
+      "command_count": 25000,
+      "repetitions": 5,
+      "throughput_ops_sec": {
+        "median": 39804,
+        "min": 38085,
+        "max": 41092,
+        "spread": 3006
+      },
+      "latency_p50_ns": {
+        "median": 10333,
+        "min": 9875,
+        "max": 10583,
+        "spread": 708
+      },
+      "latency_p95_ns": {
+        "median": 80667,
+        "min": 74958,
+        "max": 95583,
+        "spread": 20625
+      },
+      "latency_p99_ns": {
+        "median": 148041,
+        "min": 140958,
+        "max": 163666,
+        "spread": 22708
+      }
+    },
+    {
+      "implementation": "Plain Array (HEAD)",
+      "type": "plain",
+      "book_depth": 5000,
+      "command_count": 25000,
+      "repetitions": 5,
+      "throughput_ops_sec": {
+        "median": 1019865,
+        "min": 961230,
+        "max": 1584723,
+        "spread": 623493
+      },
+      "latency_p50_ns": {
+        "median": 791,
+        "min": 500,
+        "max": 875,
+        "spread": 375
+      },
+      "latency_p95_ns": {
+        "median": 1834,
+        "min": 1208,
+        "max": 1958,
+        "spread": 750
+      },
+      "latency_p99_ns": {
+        "median": 2750,
+        "min": 1792,
+        "max": 2875,
+        "spread": 1083
+      }
+    }
+  ]
+}

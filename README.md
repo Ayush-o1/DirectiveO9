@@ -219,19 +219,20 @@ npm run test:diff:long
 
 The REST and streaming API provides order entry, market data inspection, and administrative replay verification. All order placement and management endpoints require authentication via the `x-api-key` header.
 
-| Endpoint        | Method   | Authentication  | Description                                                   |
-| :-------------- | :------- | :-------------- | :------------------------------------------------------------ |
-| `/orders`       | `POST`   | Participant Key | Submit `LIMIT`, `MARKET`, or `IOC` order                      |
-| `/orders/:id`   | `DELETE` | Participant Key | Cancel resting order by order ID                              |
-| `/orders/:id`   | `GET`    | Participant Key | Query order projection by order ID                            |
-| `/book/:symbol` | `GET`    | Public          | Fetch L2 order book depth ladder (`?depth=50`)                |
-| `/trades`       | `GET`    | Public          | Query historical trade executions (`?symbol=&from_seq=`)      |
-| `/events`       | `GET`    | Public          | Query emitted engine events (`?from_seq=`)                    |
-| `/stream`       | `GET`    | Public          | Server-Sent Events (SSE) streaming depth snapshots and trades |
-| `/health`       | `GET`    | Public          | Health check reporting database and sequencer status          |
-| `/metrics`      | `GET`    | Public          | Prometheus/text operational metrics                           |
-| `/admin/verify` | `GET`    | Admin Key       | Validate 6 structural invariants against active memory state  |
-| `/admin/replay` | `POST`   | Admin Key       | Trigger on-demand journal replay and state hash audit         |
+| Endpoint              | Method   | Authentication  | Description                                                   |
+| :-------------------- | :------- | :-------------- | :------------------------------------------------------------ |
+| `/orders`             | `POST`   | Participant Key | Submit `LIMIT`, `MARKET`, or `IOC` order                      |
+| `/orders/:id`         | `DELETE` | Participant Key | Cancel resting order by order ID                              |
+| `/orders/:id`         | `GET`    | Participant Key | Query order projection by order ID                            |
+| `/book/:symbol`       | `GET`    | Public          | Fetch L2 order book depth ladder (`?depth=50`)                |
+| `/trades`             | `GET`    | Public          | Query historical trade executions (`?symbol=&from_seq=`)      |
+| `/events`             | `GET`    | Public          | Query emitted engine events (`?from_seq=`)                    |
+| `/stream`             | `GET`    | Public          | Server-Sent Events (SSE) streaming depth snapshots and trades |
+| `/health`             | `GET`    | Public          | Health check reporting database and sequencer status          |
+| `/admin/instruments`  | `POST`   | Admin Key       | Register or update tradable instrument metadata               |
+| `/admin/participants` | `POST`   | Admin Key       | Register participant credentials and API keys                 |
+| `/admin/verify`       | `GET`    | Admin Key       | Validate 6 structural invariants against active memory state  |
+| `/admin/replay`       | `POST`   | Admin Key       | Trigger on-demand journal replay and state hash audit         |
 
 Complete endpoint specifications, request/response JSON schemas, and curl examples are documented in [docs/api.md](docs/api.md).
 

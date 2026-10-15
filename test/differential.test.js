@@ -330,51 +330,66 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
         fc.property(commandSequenceArb, commands => {
           totalSequences += 1;
 
-          const engine = new MatchingEngine({ instruments, indexType: 'array' });
-          const engineAvl = new MatchingEngine({ instruments, indexType: 'avl' });
+          const testArray = !process.env.INDEX_TYPE || process.env.INDEX_TYPE === 'array';
+          const testAvl = !process.env.INDEX_TYPE || process.env.INDEX_TYPE === 'avl';
+
+          const engine = testArray ? new MatchingEngine({ instruments, indexType: 'array' }) : null;
+          const engineAvl = testAvl ? new MatchingEngine({ instruments, indexType: 'avl' }) : null;
           const oracle = new NaiveEngine({ instruments });
 
           for (const cmd of commands) {
             counts.commands += 1;
 
-            const engineEvents = engine.processCommand(cmd);
-            const avlEvents = engineAvl.processCommand(cmd);
             const oracleEvents = oracle.processCommand(cmd);
+            let activeEvents = null;
 
-            assert.deepEqual(
-              engineEvents,
-              oracleEvents,
-              `Event mismatch on command: ${JSON.stringify(cmd)}`
-            );
-            assert.deepEqual(
-              avlEvents,
-              oracleEvents,
-              `AVL Event mismatch on command: ${JSON.stringify(cmd)}`
-            );
-
-            // Compare depth for both instruments
-            for (const inst of instruments) {
-              const engineDepth = engine.getDepth(inst.symbol);
-              const avlDepth = engineAvl.getDepth(inst.symbol);
-              const oracleDepth = oracle.getDepth(inst.symbol);
+            if (engine) {
+              const engineEvents = engine.processCommand(cmd);
+              activeEvents = engineEvents;
               assert.deepEqual(
-                engineDepth,
-                oracleDepth,
-                `Depth mismatch for ${inst.symbol} on command: ${JSON.stringify(cmd)}`
-              );
-              assert.deepEqual(
-                avlDepth,
-                oracleDepth,
-                `AVL Depth mismatch for ${inst.symbol} on command: ${JSON.stringify(cmd)}`
+                engineEvents,
+                oracleEvents,
+                `Event mismatch on command: ${JSON.stringify(cmd)}`
               );
             }
 
+            if (engineAvl) {
+              const avlEvents = engineAvl.processCommand(cmd);
+              if (!activeEvents) activeEvents = avlEvents;
+              assert.deepEqual(
+                avlEvents,
+                oracleEvents,
+                `AVL Event mismatch on command: ${JSON.stringify(cmd)}`
+              );
+            }
+
+            // Compare depth for both instruments
+            for (const inst of instruments) {
+              const oracleDepth = oracle.getDepth(inst.symbol);
+              if (engine) {
+                const engineDepth = engine.getDepth(inst.symbol);
+                assert.deepEqual(
+                  engineDepth,
+                  oracleDepth,
+                  `Depth mismatch for ${inst.symbol} on command: ${JSON.stringify(cmd)}`
+                );
+              }
+              if (engineAvl) {
+                const avlDepth = engineAvl.getDepth(inst.symbol);
+                assert.deepEqual(
+                  avlDepth,
+                  oracleDepth,
+                  `AVL Depth mismatch for ${inst.symbol} on command: ${JSON.stringify(cmd)}`
+                );
+              }
+            }
+
             // Invariant verification on engine state
-            assert.equal(engine.checkInvariants(), true);
-            assert.equal(engineAvl.checkInvariants(), true);
+            if (engine) assert.equal(engine.checkInvariants(), true);
+            if (engineAvl) assert.equal(engineAvl.checkInvariants(), true);
 
             // Operational metrics tracking
-            const tradeEvents = engineEvents.filter(e => e.event === 'TRADE_EXECUTED');
+            const tradeEvents = activeEvents.filter(e => e.event === 'TRADE_EXECUTED');
             counts.trades += tradeEvents.length;
 
             if (tradeEvents.length > 1) {
@@ -388,7 +403,7 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
             let hadPartialFill = false;
             if (tradeEvents.length > 0) {
               for (const t of tradeEvents) {
-                const makerFilled = engineEvents.some(
+                const makerFilled = activeEvents.some(
                   e => e.event === 'ORDER_FILLED' && e.order_id === t.maker_order_id
                 );
                 if (!makerFilled) {
@@ -397,10 +412,10 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
                 }
               }
               if (!hadPartialFill) {
-                const takerAccepted = engineEvents.find(
+                const takerAccepted = activeEvents.find(
                   e => e.event === 'ORDER_ACCEPTED' && e.order_id === cmd.order_id
                 );
-                const takerCancelled = engineEvents.find(
+                const takerCancelled = activeEvents.find(
                   e => e.event === 'ORDER_CANCELLED' && e.order_id === cmd.order_id
                 );
                 if (takerAccepted || takerCancelled) {
@@ -410,7 +425,7 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
             }
             if (hadPartialFill) counts.partial_fills += 1;
 
-            for (const e of engineEvents) {
+            for (const e of activeEvents) {
               if (e.event === 'ORDER_CANCELLED') {
                 if (e.reason === 'CLIENT_CANCEL') counts.cancels += 1;
                 else if (e.reason === 'IOC_UNFILLED') counts.ioc_remainder_cancels += 1;

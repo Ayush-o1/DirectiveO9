@@ -1,0 +1,258 @@
+{
+  "benchmark": "api_benchmark",
+  "timestamp": "2026-10-15T12:43:02.830Z",
+  "synchronous_commit": "on",
+  "docker_vm_macos_note": "PostgreSQL runs in Docker VM on macOS; fsync overhead includes virtualization barrier and is not representative of bare-metal production NVMe.",
+  "load_generator_mode": "autocannon (fixed-rate offered load, max-rate capacity & over-capacity)",
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "8473e2c2fdf8c6e895f313fb8696cb107fa1f6c4",
+    "git_dirty": true,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "results": [
+    {
+      "configuration": "Fixed-Rate (Offered 100 req/s, Batch 20, Timeout 5ms)",
+      "batch_max_size": 20,
+      "batch_timeout_ms": 5,
+      "configured_queue_limit": 1000,
+      "mode": "fixed-rate",
+      "is_capacity_run": false,
+      "is_over_capacity_test": false,
+      "queue_full_note": null,
+      "offered_rate_req_sec": 100,
+      "achieved_rate_req_sec": {
+        "median": 100,
+        "spread": 0
+      },
+      "total_requests": {
+        "median": 400,
+        "spread": 0
+      },
+      "status_2xx_count": {
+        "median": 400,
+        "max": 400
+      },
+      "status_503_count": {
+        "median": 0,
+        "max": 0
+      },
+      "non_2xx_count": {
+        "median": 0,
+        "max": 0
+      },
+      "error_count": {
+        "median": 0,
+        "max": 0
+      },
+      "latency_p50_ms": {
+        "median": 7,
+        "spread": 1
+      },
+      "latency_p95_ms": {
+        "median": 26.34,
+        "spread": 26.01
+      },
+      "latency_p99_ms": {
+        "median": 42,
+        "spread": 39
+      }
+    },
+    {
+      "configuration": "Fixed-Rate (Offered 500 req/s, Batch 100, Timeout 10ms)",
+      "batch_max_size": 100,
+      "batch_timeout_ms": 10,
+      "configured_queue_limit": 1000,
+      "mode": "fixed-rate",
+      "is_capacity_run": false,
+      "is_over_capacity_test": false,
+      "queue_full_note": null,
+      "offered_rate_req_sec": 500,
+      "achieved_rate_req_sec": {
+        "median": 460,
+        "spread": 14
+      },
+      "total_requests": {
+        "median": 1840,
+        "spread": 56
+      },
+      "status_2xx_count": {
+        "median": 1840,
+        "max": 1872
+      },
+      "status_503_count": {
+        "median": 0,
+        "max": 0
+      },
+      "non_2xx_count": {
+        "median": 0,
+        "max": 0
+      },
+      "error_count": {
+        "median": 0,
+        "max": 0
+      },
+      "latency_p50_ms": {
+        "median": 9,
+        "spread": 0
+      },
+      "latency_p95_ms": {
+        "median": 17.33,
+        "spread": 1.67
+      },
+      "latency_p99_ms": {
+        "median": 23,
+        "spread": 8
+      }
+    },
+    {
+      "configuration": "Max-Rate Unbatched Comparison (Batch 1, Timeout 1ms, Conn 16)",
+      "batch_max_size": 1,
+      "batch_timeout_ms": 1,
+      "configured_queue_limit": 1000,
+      "mode": "unconstrained max-rate (group-commit comparison)",
+      "is_capacity_run": true,
+      "is_over_capacity_test": false,
+      "queue_full_note": null,
+      "offered_rate_req_sec": "unconstrained",
+      "achieved_rate_req_sec": {
+        "median": 821,
+        "spread": 225
+      },
+      "total_requests": {
+        "median": 3282,
+        "spread": 898
+      },
+      "status_2xx_count": {
+        "median": 3282,
+        "max": 3515
+      },
+      "status_503_count": {
+        "median": 0,
+        "max": 0
+      },
+      "non_2xx_count": {
+        "median": 0,
+        "max": 0
+      },
+      "error_count": {
+        "median": 0,
+        "max": 0
+      },
+      "latency_p50_ms": {
+        "median": 18,
+        "spread": 2
+      },
+      "latency_p95_ms": {
+        "median": 31.01,
+        "spread": 25.67
+      },
+      "latency_p99_ms": {
+        "median": 47,
+        "spread": 35
+      }
+    },
+    {
+      "configuration": "Max-Rate Group-Commit Comparison (Batch 100, Timeout 10ms, Conn 16)",
+      "batch_max_size": 100,
+      "batch_timeout_ms": 10,
+      "configured_queue_limit": 1000,
+      "mode": "unconstrained max-rate (group-commit comparison)",
+      "is_capacity_run": true,
+      "is_over_capacity_test": false,
+      "queue_full_note": null,
+      "offered_rate_req_sec": "unconstrained",
+      "achieved_rate_req_sec": {
+        "median": 692,
+        "spread": 44
+      },
+      "total_requests": {
+        "median": 2768,
+        "spread": 176
+      },
+      "status_2xx_count": {
+        "median": 2768,
+        "max": 2864
+      },
+      "status_503_count": {
+        "median": 0,
+        "max": 0
+      },
+      "non_2xx_count": {
+        "median": 0,
+        "max": 0
+      },
+      "error_count": {
+        "median": 0,
+        "max": 0
+      },
+      "latency_p50_ms": {
+        "median": 22,
+        "spread": 0
+      },
+      "latency_p95_ms": {
+        "median": 27.67,
+        "spread": 6.01
+      },
+      "latency_p99_ms": {
+        "median": 41,
+        "spread": 21
+      }
+    },
+    {
+      "configuration": "Over-Capacity Saturation Test (Queue Limit 50, Conn 80)",
+      "batch_max_size": 10,
+      "batch_timeout_ms": 15,
+      "configured_queue_limit": 50,
+      "mode": "over-capacity test (queue limit 50, 80 concurrent connections)",
+      "is_capacity_run": false,
+      "is_over_capacity_test": true,
+      "queue_full_note": "Saturates ingress queue (limit 50 with 80 concurrent connections) to measure 503 QUEUE_FULL rejection behavior with zero socket errors.",
+      "offered_rate_req_sec": "unconstrained",
+      "achieved_rate_req_sec": {
+        "median": 9924,
+        "spread": 1051
+      },
+      "total_requests": {
+        "median": 29768,
+        "spread": 3150
+      },
+      "status_2xx_count": {
+        "median": 1020,
+        "max": 1060
+      },
+      "status_503_count": {
+        "median": 28748,
+        "max": 29561
+      },
+      "non_2xx_count": {
+        "median": 28748,
+        "max": 29561
+      },
+      "error_count": {
+        "median": 0,
+        "max": 0
+      },
+      "latency_p50_ms": {
+        "median": 1,
+        "spread": 0
+      },
+      "latency_p95_ms": {
+        "median": 112.72,
+        "spread": 3.34
+      },
+      "latency_p99_ms": {
+        "median": 180,
+        "spread": 12
+      }
+    }
+  ]
+}

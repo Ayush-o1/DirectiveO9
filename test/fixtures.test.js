@@ -31,7 +31,8 @@ describe('Golden Scenario Fixtures', () => {
       );
 
       if (isMatchingFixture) {
-        for (const indexType of ['array', 'avl']) {
+        const targetIndices = process.env.INDEX_TYPE ? [process.env.INDEX_TYPE] : ['array', 'avl'];
+        for (const indexType of targetIndices) {
           const engine = new MatchingEngine({
             instruments: [
               {
@@ -74,6 +75,7 @@ describe('Golden Scenario Fixtures', () => {
           symbol: fixture.symbol,
           tick_size: fixture.tick_size,
           lot_size: fixture.lot_size,
+          indexType: process.env.INDEX_TYPE || 'array',
         });
 
         const actualEvents = [];
