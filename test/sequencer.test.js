@@ -524,4 +524,40 @@ describe('Sequencer & Idempotency Unit Tests', () => {
     assert.equal(cancelRes.body.success, true);
     await sequencer.close();
   });
+
+  it('regression: flushes pending batch in child process without any ambient event loop handles', async () => {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+
+    const script = `
+      import { Sequencer } from './src/sequencer/sequencer.js';
+      const seq = new Sequencer({ batchMaxSize: 10, batchTimeoutMs: 25 });
+      await seq.init();
+      seq.engine.registerInstrument({ symbol: 'BTC-USDT', tick_size: 1, lot_size: 1 });
+      seq.enqueue({
+        type: 'LIMIT',
+        symbol: 'BTC-USDT',
+        side: 'BUY',
+        price: 100,
+        quantity: 1,
+        participant_id: 1,
+        client_order_id: 'regr-1'
+      }).then(res => {
+        console.log('BATCH_FLUSHED:' + res.body.seq);
+        process.exit(0);
+      });
+    `;
+
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ['--input-type=module', '-e', script],
+      {
+        cwd: process.cwd(),
+        timeout: 3000,
+      }
+    );
+
+    assert.ok(stdout.includes('BATCH_FLUSHED:1'), 'Child process flushed batch via ref timer');
+  });
 });

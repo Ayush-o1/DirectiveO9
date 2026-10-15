@@ -281,6 +281,8 @@ export async function replayJournal({
   return {
     verified: true,
     commands_replayed: commands.length,
+    events_verified: storedEvents.length,
+    trades_verified: storedTrades.length,
     from_seq: fromSeq,
     to_seq: effectiveToSeq,
     state_hash: stateHash,

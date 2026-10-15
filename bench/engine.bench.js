@@ -99,8 +99,10 @@ async function main() {
   const scenarios = [
     { name: 'Shallow Book (Depth 10)', bookDepth: 10, indexType: 'array', label: 'sorted-array' },
     { name: 'Shallow Book (Depth 10)', bookDepth: 10, indexType: 'avl', label: 'avl-tree' },
-    { name: 'Deep Book (Depth 2000)', bookDepth: 2000, indexType: 'array', label: 'sorted-array' },
-    { name: 'Deep Book (Depth 2000)', bookDepth: 2000, indexType: 'avl', label: 'avl-tree' },
+    { name: 'Medium Book (Depth 500)', bookDepth: 500, indexType: 'array', label: 'sorted-array' },
+    { name: 'Medium Book (Depth 500)', bookDepth: 500, indexType: 'avl', label: 'avl-tree' },
+    { name: 'Deep Book (Depth 5000)', bookDepth: 5000, indexType: 'array', label: 'sorted-array' },
+    { name: 'Deep Book (Depth 5000)', bookDepth: 5000, indexType: 'avl', label: 'avl-tree' },
   ];
 
   const results = [];

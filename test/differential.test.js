@@ -330,13 +330,15 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
         fc.property(commandSequenceArb, commands => {
           totalSequences += 1;
 
-          const engine = new MatchingEngine({ instruments });
+          const engine = new MatchingEngine({ instruments, indexType: 'array' });
+          const engineAvl = new MatchingEngine({ instruments, indexType: 'avl' });
           const oracle = new NaiveEngine({ instruments });
 
           for (const cmd of commands) {
             counts.commands += 1;
 
             const engineEvents = engine.processCommand(cmd);
+            const avlEvents = engineAvl.processCommand(cmd);
             const oracleEvents = oracle.processCommand(cmd);
 
             assert.deepEqual(
@@ -344,20 +346,32 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
               oracleEvents,
               `Event mismatch on command: ${JSON.stringify(cmd)}`
             );
+            assert.deepEqual(
+              avlEvents,
+              oracleEvents,
+              `AVL Event mismatch on command: ${JSON.stringify(cmd)}`
+            );
 
             // Compare depth for both instruments
             for (const inst of instruments) {
               const engineDepth = engine.getDepth(inst.symbol);
+              const avlDepth = engineAvl.getDepth(inst.symbol);
               const oracleDepth = oracle.getDepth(inst.symbol);
               assert.deepEqual(
                 engineDepth,
                 oracleDepth,
                 `Depth mismatch for ${inst.symbol} on command: ${JSON.stringify(cmd)}`
               );
+              assert.deepEqual(
+                avlDepth,
+                oracleDepth,
+                `AVL Depth mismatch for ${inst.symbol} on command: ${JSON.stringify(cmd)}`
+              );
             }
 
             // Invariant verification on engine state
             assert.equal(engine.checkInvariants(), true);
+            assert.equal(engineAvl.checkInvariants(), true);
 
             // Operational metrics tracking
             const tradeEvents = engineEvents.filter(e => e.event === 'TRADE_EXECUTED');

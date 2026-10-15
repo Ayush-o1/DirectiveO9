@@ -81,44 +81,46 @@ export function removePrice(prices, price, isDescending) {
 }
 
 /**
- * Sorted Array Price Level Index using binary search.
+ * Sorted Array Price Level Index using binary search over a plain native array.
  * Conforms to the PriceLevelIndex contract.
  */
-export class SortedArrayPriceIndex extends Array {
-  static get [Symbol.species]() {
-    return Array;
+export class SortedArrayPriceIndex {
+  constructor(isDescending = false) {
+    this.prices = [];
+    this.isDescending = Boolean(isDescending);
   }
 
-  constructor(isDescending = false) {
-    if (typeof isDescending === 'number') {
-      super(isDescending);
-      this.isDescending = false;
-    } else {
-      super();
-      this.isDescending = Boolean(isDescending);
-    }
+  get length() {
+    return this.prices.length;
+  }
+
+  get 0() {
+    return this.prices[0];
   }
 
   peek() {
-    return this.length > 0 ? this[0] : undefined;
+    return this.prices.length > 0 ? this.prices[0] : undefined;
   }
 
   has(price) {
-    return findPriceIndex(this, price, this.isDescending) !== -1;
+    return findPriceIndex(this.prices, price, this.isDescending) !== -1;
   }
 
   insert(price) {
-    const prevLen = this.length;
-    insertPrice(this, price, this.isDescending);
-    return this.length > prevLen;
+    const prevLen = this.prices.length;
+    insertPrice(this.prices, price, this.isDescending);
+    return this.prices.length > prevLen;
   }
 
   remove(price) {
-    return removePrice(this, price, this.isDescending) !== -1;
+    return removePrice(this.prices, price, this.isDescending) !== -1;
   }
 
   toArray(limit) {
-    const list = Array.from(this);
-    return typeof limit === 'number' && limit > 0 ? list.slice(0, limit) : list;
+    return typeof limit === 'number' && limit > 0 ? this.prices.slice(0, limit) : [...this.prices];
+  }
+
+  *[Symbol.iterator]() {
+    yield* this.prices;
   }
 }

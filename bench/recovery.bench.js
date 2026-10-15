@@ -6,15 +6,19 @@ import { MatchingEngine } from '../src/engine/engine.js';
 import { generateWorkload } from './workload.js';
 import { computeStateHash } from '../src/engine/hash.js';
 import { getBenchmarkEnv, computeStats } from './env.js';
+import { getPool, closePool } from '../src/db/pool.js';
+import { replayJournal } from '../src/sequencer/replay.js';
+import { Sequencer } from '../src/sequencer/sequencer.js';
+import { runMigrations } from '../src/db/migrator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Replays a journal command sequence through a fresh MatchingEngine instance,
+ * Replays a journal command sequence purely in memory through a fresh MatchingEngine instance,
  * recording precise monotonic duration and heap memory growth.
  */
-function measureReplayTrial({ commands, symbol = 'BTC-USDT' }) {
+function measureInMemoryReplayTrial({ commands, symbol = 'BTC-USDT' }) {
   if (typeof globalThis.gc === 'function') {
     globalThis.gc();
   }
@@ -53,6 +57,97 @@ function measureReplayTrial({ commands, symbol = 'BTC-USDT' }) {
   };
 }
 
+/**
+ * Replays journal from PostgreSQL (reading commands, events, and trades from disk,
+ * replaying through a fresh MatchingEngine, and validating bit-for-bit event parity).
+ */
+async function measurePostgresStartupTrial({ pool, fromSeq = 1, toSeq }) {
+  if (typeof globalThis.gc === 'function') {
+    globalThis.gc();
+  }
+
+  const t0 = process.hrtime.bigint();
+  const result = await replayJournal({
+    pool,
+    fromSeq,
+    toSeq,
+    oracle: false,
+  });
+  const t1 = process.hrtime.bigint();
+
+  const durationMs = Number(t1 - t0) / 1e6;
+  const commandCount = result.commands_replayed;
+  const throughputOpsSec = commandCount / (Number(t1 - t0) / 1e9);
+
+  if (!result.verified) {
+    throw new Error(
+      `Divergence detected during startup recovery: ${JSON.stringify(result.divergence)}`
+    );
+  }
+
+  return {
+    commandCount,
+    durationMs,
+    throughputOpsSec,
+    eventsVerified: result.events_verified,
+    tradesVerified: result.trades_verified,
+    stateHash: result.state_hash,
+  };
+}
+
+/**
+ * Seeds PostgreSQL journal with a deterministic workload up to target count.
+ */
+async function populateDatabaseJournal(pool, count, symbol = 'BTC-USDT') {
+  console.log(`  Populating PostgreSQL journal with ${count.toLocaleString()} commands...`);
+  await pool.query('TRUNCATE commands, events, trades, orders CASCADE;');
+  await pool.query(
+    'INSERT INTO instruments (symbol, tick_size, lot_size) VALUES ($1, 1, 1) ON CONFLICT (symbol) DO NOTHING;',
+    [symbol]
+  );
+  await pool.query(
+    "INSERT INTO participants (participant_id, name, api_key_hash, is_admin) VALUES (1, 'MM1', 'dummy', false), (2, 'MM2', 'dummy', false), (3, 'TRADER1', 'dummy', false), (4, 'TRADER2', 'dummy', false) ON CONFLICT (participant_id) DO NOTHING;"
+  );
+
+  const sequencer = new Sequencer({
+    pool,
+    batchMaxSize: 1000,
+    batchTimeoutMs: 2,
+  });
+  await sequencer.init();
+
+  const commands = generateWorkload({
+    seed: 42 + count,
+    count,
+    symbol,
+    tick_size: 1,
+    lot_size: 1,
+    book_depth: 50,
+  });
+
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < count; i += CHUNK_SIZE) {
+    const chunk = commands.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map(c =>
+        sequencer.enqueue({
+          type: c.type,
+          symbol: c.symbol,
+          side: c.side,
+          price: c.price,
+          quantity: c.quantity,
+          order_id: c.order_id,
+          participant_id: c.participant_id,
+          client_order_id: c.client_order_id,
+        })
+      )
+    );
+  }
+
+  await sequencer.close();
+  console.log(`  Committed ${count.toLocaleString()} commands to PostgreSQL journal.`);
+}
+
 async function main() {
   console.log('DirectiveO9 Recovery & Startup Replay Benchmark');
   console.log('==============================================');
@@ -61,16 +156,22 @@ async function main() {
   console.log(
     `Environment: Node ${env.node_version} | ${env.cpu_model} (${env.cpu_count} cores) | OS: ${env.os_type} ${env.os_release}`
   );
-  console.log('Evaluating startup replay scaling across 3 journal sizes (5 runs each)...\n');
+
+  const pool = getPool();
+  await runMigrations({ pool });
 
   const JOURNAL_SIZES = [1000, 5000, 20000];
   const REPETITIONS = 5;
   const symbol = 'BTC-USDT';
 
-  const results = [];
+  // 1. In-Memory Engine Replay Benchmark
+  console.log('\n--- Section 1: In-Memory Engine Replay Scaling (Cold Engine Replay) ---');
+  const inMemoryResults = [];
 
   for (const size of JOURNAL_SIZES) {
-    console.log(`Testing Journal Size: ${size.toLocaleString()} commands (${REPETITIONS} runs)...`);
+    console.log(
+      `Testing In-Memory Replay: ${size.toLocaleString()} commands (${REPETITIONS} runs)...`
+    );
 
     const durations = [];
     const throughputs = [];
@@ -79,7 +180,6 @@ async function main() {
     let restingCount = 0;
     let finalHash = '';
 
-    // Generate deterministic workload for this size
     const commands = generateWorkload({
       seed: 42 + size,
       count: size,
@@ -90,7 +190,7 @@ async function main() {
     });
 
     for (let r = 0; r < REPETITIONS; r++) {
-      const trial = measureReplayTrial({ commands, symbol });
+      const trial = measureInMemoryReplayTrial({ commands, symbol });
       durations.push(trial.durationMs);
       throughputs.push(trial.throughputOpsSec);
       heapGrowths.push(trial.heapGrowthMB);
@@ -99,7 +199,7 @@ async function main() {
       finalHash = trial.stateHash;
 
       process.stdout.write(
-        `  Run ${r + 1}/${REPETITIONS}: replay = ${trial.durationMs.toFixed(2)} ms (${Math.round(trial.throughputOpsSec).toLocaleString()} ops/s) | heap growth = ${trial.heapGrowthMB} MB\n`
+        `  Run ${r + 1}/${REPETITIONS}: duration = ${trial.durationMs.toFixed(2)} ms | throughput = ${Math.round(trial.throughputOpsSec).toLocaleString()} ops/s | heap = +${trial.heapGrowthMB} MB\n`
       );
     }
 
@@ -107,39 +207,106 @@ async function main() {
     const throughputStats = computeStats(throughputs);
     const heapStats = computeStats(heapGrowths);
 
-    results.push({
+    inMemoryResults.push({
+      benchmark_type: 'in_memory_engine_replay',
       journal_size: size,
       runs: REPETITIONS,
       replay_duration_ms: {
-        median: durationStats.median,
-        spread: durationStats.spread,
+        median: Number(durationStats.median.toFixed(2)),
+        spread: Number(durationStats.spread.toFixed(2)),
       },
       replay_throughput_ops_sec: {
         median: Math.round(throughputStats.median),
         spread: Math.round(throughputStats.spread),
       },
       heap_growth_mb: {
-        median: heapStats.median,
-        spread: heapStats.spread,
+        median: Number(heapStats.median.toFixed(3)),
+        spread: Number(heapStats.spread.toFixed(3)),
       },
       order_registry_size: registryCount,
       resting_orders_on_book: restingCount,
       canonical_state_hash: finalHash,
     });
-
     console.log();
   }
 
-  console.log('SUMMARY RESULTS:');
+  // 2. Full Startup Recovery Benchmark (PostgreSQL Journal Read + Replay + Event Parity Check)
+  console.log(
+    '--- Section 2: Full Startup Recovery (PostgreSQL Read + Engine Replay + Parity Verification) ---'
+  );
+  const fullStartupResults = [];
+
+  for (const size of JOURNAL_SIZES) {
+    console.log(
+      `Testing Full Startup Recovery: ${size.toLocaleString()} commands (${REPETITIONS} runs)...`
+    );
+    await populateDatabaseJournal(pool, size, symbol);
+
+    const durations = [];
+    const throughputs = [];
+    let eventsVerified = 0;
+    let tradesVerified = 0;
+    let finalHash = '';
+
+    for (let r = 0; r < REPETITIONS; r++) {
+      const trial = await measurePostgresStartupTrial({ pool, fromSeq: 1, toSeq: size });
+      durations.push(trial.durationMs);
+      throughputs.push(trial.throughputOpsSec);
+      eventsVerified = trial.eventsVerified;
+      tradesVerified = trial.tradesVerified;
+      finalHash = trial.stateHash;
+
+      process.stdout.write(
+        `  Run ${r + 1}/${REPETITIONS}: recovery duration = ${trial.durationMs.toFixed(2)} ms | effective throughput = ${Math.round(trial.throughputOpsSec).toLocaleString()} ops/s | events verified = ${eventsVerified} | trades verified = ${tradesVerified}\n`
+      );
+    }
+
+    const durationStats = computeStats(durations);
+    const throughputStats = computeStats(throughputs);
+
+    fullStartupResults.push({
+      benchmark_type: 'full_startup_recovery',
+      journal_size: size,
+      runs: REPETITIONS,
+      recovery_duration_ms: {
+        median: Number(durationStats.median.toFixed(2)),
+        spread: Number(durationStats.spread.toFixed(2)),
+      },
+      effective_throughput_ops_sec: {
+        median: Math.round(throughputStats.median),
+        spread: Math.round(throughputStats.spread),
+      },
+      events_verified: eventsVerified,
+      trades_verified: tradesVerified,
+      canonical_state_hash: finalHash,
+      divergences: 0,
+    });
+    console.log();
+  }
+
+  await closePool();
+
+  console.log('SUMMARY: In-Memory Engine Replay');
   console.table(
-    results.map(r => ({
-      'Journal Size': r.journal_size.toLocaleString(),
-      'Replay Time (median ms)': r.replay_duration_ms.median,
+    inMemoryResults.map(r => ({
+      'Size (cmds)': r.journal_size,
+      'Replay Duration (median ms)': r.replay_duration_ms.median,
       'Spread (ms)': r.replay_duration_ms.spread,
-      'Throughput (median ops/s)': r.replay_throughput_ops_sec.median.toLocaleString(),
-      'Heap Growth (median MB)': r.heap_growth_mb.median,
-      'Orders in Registry': r.order_registry_size.toLocaleString(),
-      'Resting on Book': r.resting_orders_on_book.toLocaleString(),
+      'Throughput (median ops/s)': r.replay_throughput_ops_sec.median,
+      'Heap Growth (MB)': r.heap_growth_mb.median,
+    }))
+  );
+
+  console.log('\nSUMMARY: Full Startup Recovery (PostgreSQL Read + Replay + Event Verification)');
+  console.table(
+    fullStartupResults.map(r => ({
+      'Journal Size (cmds)': r.journal_size,
+      'Recovery Duration (median ms)': r.recovery_duration_ms.median,
+      'Spread (ms)': r.recovery_duration_ms.spread,
+      'Effective Rate (ops/s)': r.effective_throughput_ops_sec.median,
+      'Events Verified': r.events_verified,
+      'Trades Verified': r.trades_verified,
+      Divergences: r.divergences,
     }))
   );
 
@@ -148,7 +315,10 @@ async function main() {
     benchmark: 'recovery_benchmark',
     timestamp: new Date().toISOString(),
     environment: env,
-    results,
+    in_memory_results: inMemoryResults,
+    full_startup_results: fullStartupResults,
+    // Maintain backwards compatible top-level results key for any existing tools
+    results: inMemoryResults,
   };
 
   const resultsDir = path.join(__dirname, 'results');
@@ -161,7 +331,8 @@ async function main() {
   console.log(`\nBenchmark results written to: bench/results/recovery-benchmark-${timestamp}.json`);
 }
 
-main().catch(err => {
+main().catch(async err => {
   console.error(err);
+  await closePool();
   process.exit(1);
 });

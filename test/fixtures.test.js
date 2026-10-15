@@ -31,39 +31,42 @@ describe('Golden Scenario Fixtures', () => {
       );
 
       if (isMatchingFixture) {
-        const engine = new MatchingEngine({
-          instruments: [
-            {
-              symbol: fixture.symbol,
-              tick_size: fixture.tick_size,
-              lot_size: fixture.lot_size,
-            },
-          ],
-        });
-
-        const actualEvents = [];
-
-        for (const cmd of fixture.commands) {
-          const events = engine.processCommand({
-            symbol: cmd.symbol ?? fixture.symbol,
-            ...cmd,
+        for (const indexType of ['array', 'avl']) {
+          const engine = new MatchingEngine({
+            instruments: [
+              {
+                symbol: fixture.symbol,
+                tick_size: fixture.tick_size,
+                lot_size: fixture.lot_size,
+              },
+            ],
+            indexType,
           });
-          actualEvents.push(...events);
 
-          assert.equal(engine.checkInvariants(), true);
-        }
+          const actualEvents = [];
 
-        assert.deepEqual(actualEvents, fixture.expected_events);
+          for (const cmd of fixture.commands) {
+            const events = engine.processCommand({
+              symbol: cmd.symbol ?? fixture.symbol,
+              ...cmd,
+            });
+            actualEvents.push(...events);
 
-        const depth = engine.getDepth(fixture.symbol);
-        if (fixture.expected_book) {
-          if (fixture.expected_book.depth) {
-            assert.deepEqual(depth.bids, fixture.expected_book.depth.bids);
-            assert.deepEqual(depth.asks, fixture.expected_book.depth.asks);
+            assert.equal(engine.checkInvariants(), true);
           }
-          const book = engine.books.get(fixture.symbol);
-          assert.deepEqual(book.getBestBid(), fixture.expected_book.best_bid);
-          assert.deepEqual(book.getBestAsk(), fixture.expected_book.best_ask);
+
+          assert.deepEqual(actualEvents, fixture.expected_events);
+
+          const depth = engine.getDepth(fixture.symbol);
+          if (fixture.expected_book) {
+            if (fixture.expected_book.depth) {
+              assert.deepEqual(depth.bids, fixture.expected_book.depth.bids);
+              assert.deepEqual(depth.asks, fixture.expected_book.depth.asks);
+            }
+            const book = engine.books.get(fixture.symbol);
+            assert.deepEqual(book.getBestBid(), fixture.expected_book.best_bid);
+            assert.deepEqual(book.getBestAsk(), fixture.expected_book.best_ask);
+          }
         }
       } else {
         // Book core legacy fixtures (01 to 16)
