@@ -544,6 +544,134 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
     assert.equal(verifyRes.body.invariants_passed, true);
   });
 
+  it('handles batch commit failure with fail-stop recovery and journal rebuild', async () => {
+    const initialSeq = sequencer.lastSeq;
+
+    // Inject commit failure on next batch
+    sequencer._faultInjection = { failCommitOnce: true };
+
+    const failRes = await apiRequest('/orders', {
+      method: 'POST',
+      headers: { 'X-API-Key': mm1Key },
+      body: JSON.stringify({
+        symbol: 'BTC-USDT',
+        side: 'BUY',
+        type: 'LIMIT',
+        price: 70,
+        quantity: 10,
+      }),
+    });
+
+    assert.equal(failRes.status, 500);
+    assert.equal(failRes.body.error, 'COMMIT_FAILED');
+
+    // Sequencer recovered and rolled back in-memory sequence counter to match DB
+    assert.equal(sequencer.isRecovering, false);
+    assert.equal(sequencer.lastSeq, initialSeq);
+
+    // Verify uncommitted order was not written to database
+    const { rows } = await pool.query('SELECT * FROM commands WHERE seq > $1', [initialSeq]);
+    assert.equal(rows.length, 0);
+
+    // Verify subsequent submissions succeed seamlessly and advance seq from clean state
+    const successRes = await apiRequest('/orders', {
+      method: 'POST',
+      headers: { 'X-API-Key': mm1Key },
+      body: JSON.stringify({
+        symbol: 'BTC-USDT',
+        side: 'BUY',
+        type: 'LIMIT',
+        price: 70,
+        quantity: 10,
+      }),
+    });
+
+    assert.equal(successRes.status, 201);
+    assert.equal(successRes.body.seq, initialSeq + 1);
+  });
+
+  it('resolves duplicate commands through PostgreSQL constraint after in-memory cache eviction', async () => {
+    // 1. Submit order
+    const origRes = await apiRequest('/orders', {
+      method: 'POST',
+      headers: { 'X-API-Key': mm1Key },
+      body: JSON.stringify({
+        client_order_id: 'evict-test-100',
+        symbol: 'BTC-USDT',
+        side: 'BUY',
+        type: 'LIMIT',
+        price: 60,
+        quantity: 5,
+      }),
+    });
+    assert.equal(origRes.status, 201);
+    const origSeq = origRes.body.seq;
+
+    // 2. Simulate LRU cache eviction
+    sequencer.idempotencyCache.delete(1, 'evict-test-100');
+    assert.equal(sequencer.idempotencyCache.has(1, 'evict-test-100'), false);
+
+    // 3. Duplicate arrival after eviction resolves through database
+    const dupRes = await apiRequest('/orders', {
+      method: 'POST',
+      headers: { 'X-API-Key': mm1Key },
+      body: JSON.stringify({
+        client_order_id: 'evict-test-100',
+        symbol: 'BTC-USDT',
+        side: 'BUY',
+        type: 'LIMIT',
+        price: 60,
+        quantity: 5,
+      }),
+    });
+    assert.equal(dupRes.status, 201);
+    assert.equal(dupRes.body.seq, origSeq);
+    assert.equal(sequencer.idempotencyCache.has(1, 'evict-test-100'), true);
+
+    // 4. Evict again and submit with conflicting payload -> 409 Conflict
+    sequencer.idempotencyCache.delete(1, 'evict-test-100');
+    const conflictRes = await apiRequest('/orders', {
+      method: 'POST',
+      headers: { 'X-API-Key': mm1Key },
+      body: JSON.stringify({
+        client_order_id: 'evict-test-100',
+        symbol: 'BTC-USDT',
+        side: 'BUY',
+        type: 'LIMIT',
+        price: 65, // Changed price
+        quantity: 5,
+      }),
+    });
+    assert.equal(conflictRes.status, 409);
+    assert.equal(conflictRes.body.error, 'IDEMPOTENCY_CONFLICT');
+  });
+
+  it('fails startup with clear error when database events diverge from regenerated replay', async () => {
+    // Query an existing event
+    const { rows } = await pool.query('SELECT event_id, event_type FROM events LIMIT 1');
+    assert.ok(rows.length > 0);
+    const targetEventId = rows[0].event_id;
+    const originalEvent = rows[0].event_type;
+
+    // Tamper with the event in database
+    await pool.query('UPDATE events SET event_type = $1 WHERE event_id = $2', [
+      'TAMPERED_EVENT',
+      targetEventId,
+    ]);
+
+    const badSequencer = new Sequencer({ pool });
+    await assert.rejects(
+      () => badSequencer.init(),
+      err => err.message.includes('Startup replay divergence at seq')
+    );
+
+    // Restore database row
+    await pool.query('UPDATE events SET event_type = $1 WHERE event_id = $2', [
+      originalEvent,
+      targetEventId,
+    ]);
+  });
+
   it('streams live events over Server-Sent Events (SSE)', async () => {
     // Connect to /stream
     const controller = new AbortController();

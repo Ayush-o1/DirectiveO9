@@ -7,8 +7,8 @@ export class Sequencer extends EventEmitter {
     engine = new MatchingEngine(),
     pool,
     maxQueueSize = 1000,
-    batchMaxSize = 100,
-    batchTimeoutMs = 5,
+    batchMaxSize = Number(process.env.BATCH_MAX_SIZE || 100),
+    batchTimeoutMs = Number(process.env.BATCH_TIMEOUT_MS || 5),
     idempotencyCacheSize = 10000,
   } = {}) {
     super();
@@ -26,11 +26,16 @@ export class Sequencer extends EventEmitter {
     this.isFlushing = false;
     this.flushTimer = null;
     this.isShuttingDown = false;
+    this.isRecovering = false;
+    this._faultInjection = null;
   }
 
   async init() {
     if (!this.pool) return;
+    await this._replayJournal();
+  }
 
+  async _replayJournal(fromSeq = 1, toSeq = Infinity) {
     // 1. Load registered instruments from database
     const { rows: instrumentRows } = await this.pool.query(
       'SELECT symbol, tick_size, lot_size FROM instruments'
@@ -51,16 +56,53 @@ export class Sequencer extends EventEmitter {
     );
     this.lastSeq = Number(seqRows[0].max_seq);
 
-    // 3. Replay journal through engine from beginning to restore state
-    const { rows: commandRows } = await this.pool.query(`
-      SELECT seq, command_type, participant_id, client_order_id, symbol, side,
-             price, quantity, order_id, payload_hash, status, response_status,
-             response_body, ts
-      FROM commands
-      ORDER BY seq ASC
-    `);
+    const maxQuerySeq = toSeq === Infinity ? null : toSeq;
+
+    // 3. Query all commands
+    const { rows: commandRows } = await this.pool.query(
+      `SELECT seq, command_type, participant_id, client_order_id, symbol, side,
+              price, quantity, order_id, payload_hash, status, response_status,
+              response_body, ts
+       FROM commands
+       WHERE seq >= $1 AND ($2::bigint IS NULL OR seq <= $2)
+       ORDER BY seq ASC`,
+      [fromSeq, maxQuerySeq]
+    );
+
+    // 4. Query all stored events and trades for comparison
+    const { rows: storedEvents } = await this.pool.query(
+      `SELECT event_id, seq, event_type, order_id, participant_id, payload, ts
+       FROM events
+       WHERE seq >= $1 AND ($2::bigint IS NULL OR seq <= $2)
+       ORDER BY seq ASC, event_id ASC`,
+      [fromSeq, maxQuerySeq]
+    );
+
+    const { rows: storedTrades } = await this.pool.query(
+      `SELECT trade_id, seq, symbol, price, quantity, maker_order_id, taker_order_id,
+              maker_participant_id, taker_participant_id, taker_side, ts
+       FROM trades
+       WHERE seq >= $1 AND ($2::bigint IS NULL OR seq <= $2)
+       ORDER BY seq ASC, trade_id ASC`,
+      [fromSeq, maxQuerySeq]
+    );
+
+    const eventsBySeq = new Map();
+    for (const ev of storedEvents) {
+      const s = Number(ev.seq);
+      if (!eventsBySeq.has(s)) eventsBySeq.set(s, []);
+      eventsBySeq.get(s).push(ev);
+    }
+
+    const tradesBySeq = new Map();
+    for (const tr of storedTrades) {
+      const s = Number(tr.seq);
+      if (!tradesBySeq.has(s)) tradesBySeq.set(s, []);
+      tradesBySeq.get(s).push(tr);
+    }
 
     for (const row of commandRows) {
+      const cmdSeq = Number(row.seq);
       const cmd = {
         type: row.command_type,
         order_id: row.order_id ? Number(row.order_id) : null,
@@ -69,11 +111,56 @@ export class Sequencer extends EventEmitter {
         side: row.side,
         price: row.price !== null ? Number(row.price) : null,
         quantity: row.quantity !== null ? Number(row.quantity) : null,
-        seq: Number(row.seq),
+        seq: cmdSeq,
         ts: Number(row.ts),
       };
 
-      this.engine.processCommand(cmd);
+      const regeneratedEvents = this.engine.processCommand(cmd);
+
+      // Verify regenerated events against stored rows
+      const expectedEvents = eventsBySeq.get(cmdSeq) || [];
+      if (regeneratedEvents.length !== expectedEvents.length) {
+        throw new Error(
+          `Startup replay divergence at seq ${cmdSeq}: expected ${expectedEvents.length} events but regenerated ${regeneratedEvents.length}`
+        );
+      }
+
+      for (let i = 0; i < regeneratedEvents.length; i++) {
+        const regEv = regeneratedEvents[i];
+        const expEv = expectedEvents[i];
+        if (regEv.event !== expEv.event_type) {
+          throw new Error(
+            `Startup replay divergence at seq ${cmdSeq}: event[${i}] type mismatch (expected ${expEv.event_type}, got ${regEv.event})`
+          );
+        }
+        if (regEv.order_id && expEv.order_id && Number(regEv.order_id) !== Number(expEv.order_id)) {
+          throw new Error(
+            `Startup replay divergence at seq ${cmdSeq}: event[${i}] order_id mismatch (expected ${expEv.order_id}, got ${regEv.order_id})`
+          );
+        }
+      }
+
+      // Verify trades against stored rows
+      const regeneratedTrades = regeneratedEvents.filter(e => e.event === 'TRADE_EXECUTED');
+      const expectedTrades = tradesBySeq.get(cmdSeq) || [];
+      if (regeneratedTrades.length !== expectedTrades.length) {
+        throw new Error(
+          `Startup replay divergence at seq ${cmdSeq}: expected ${expectedTrades.length} trades but regenerated ${regeneratedTrades.length}`
+        );
+      }
+
+      for (let i = 0; i < regeneratedTrades.length; i++) {
+        const regTr = regeneratedTrades[i];
+        const expTr = expectedTrades[i];
+        if (
+          Number(regTr.price) !== Number(expTr.price) ||
+          Number(regTr.quantity) !== Number(expTr.quantity) ||
+          Number(regTr.maker_order_id) !== Number(expTr.maker_order_id) ||
+          Number(regTr.taker_order_id) !== Number(expTr.taker_order_id)
+        ) {
+          throw new Error(`Startup replay divergence at seq ${cmdSeq}: trade[${i}] mismatch`);
+        }
+      }
 
       // Rebuild in-memory idempotency cache
       if (row.client_order_id) {
@@ -81,7 +168,7 @@ export class Sequencer extends EventEmitter {
           payload_hash: row.payload_hash,
           response_status: row.response_status,
           response_body: row.response_body,
-          seq: Number(row.seq),
+          seq: cmdSeq,
         });
       }
     }
@@ -90,19 +177,40 @@ export class Sequencer extends EventEmitter {
     this.engine.checkInvariants();
   }
 
-  enqueue(commandPayload) {
+  async _rebuildFromJournal() {
+    const freshEngine = new MatchingEngine();
+    for (const [sym, inst] of this.engine.instruments.entries()) {
+      freshEngine.registerInstrument({
+        symbol: sym,
+        tick_size: inst.tick_size,
+        lot_size: inst.lot_size,
+      });
+    }
+    this.engine = freshEngine;
+    this.idempotencyCache.clear();
+    await this._replayJournal();
+  }
+
+  async enqueue(commandPayload) {
     if (this.isShuttingDown) {
       const err = new Error('Service shutting down');
       err.status = 503;
       err.code = 'SERVICE_UNAVAILABLE';
-      return Promise.reject(err);
+      throw err;
+    }
+
+    if (this.isRecovering) {
+      const err = new Error('Sequencer is recovering state after a batch commit failure');
+      err.status = 503;
+      err.code = 'SERVICE_RECOVERING';
+      throw err;
     }
 
     const { participant_id, client_order_id } = commandPayload;
     const payloadHash = computePayloadHash(commandPayload);
 
-    // 1. Idempotency Check: Committed Cache
     if (client_order_id) {
+      // 1. Idempotency Check: Committed Cache
       const cached = this.idempotencyCache.get(participant_id, client_order_id);
       if (cached) {
         if (cached.payload_hash !== payloadHash) {
@@ -111,12 +219,12 @@ export class Sequencer extends EventEmitter {
           );
           err.status = 409;
           err.code = 'IDEMPOTENCY_CONFLICT';
-          return Promise.reject(err);
+          throw err;
         }
-        return Promise.resolve({
+        return {
           status: cached.response_status,
           body: cached.response_body,
-        });
+        };
       }
 
       // 2. Idempotency Check: In-Flight Request Coalescence
@@ -129,22 +237,55 @@ export class Sequencer extends EventEmitter {
           );
           err.status = 409;
           err.code = 'IDEMPOTENCY_CONFLICT';
-          return Promise.reject(err);
+          throw err;
         }
 
-        // Attach to existing in-flight promise
         return new Promise((resolve, reject) => {
           inFlight.callbacks.push({ resolve, reject });
         });
       }
+
+      // 3. Database check on cache miss (resolving evicted entries through PostgreSQL constraint)
+      if (this.pool) {
+        const { rows } = await this.pool.query(
+          `SELECT seq, command_type, participant_id, client_order_id, symbol, side,
+                  price, quantity, order_id, payload_hash, status, response_status, response_body
+           FROM commands
+           WHERE participant_id = $1 AND client_order_id = $2`,
+          [participant_id, client_order_id]
+        );
+        if (rows.length > 0) {
+          const row = rows[0];
+          if (row.payload_hash !== payloadHash) {
+            const err = new Error(
+              'client_order_id was previously submitted with a different payload'
+            );
+            err.status = 409;
+            err.code = 'IDEMPOTENCY_CONFLICT';
+            throw err;
+          }
+
+          const responseStatus = row.response_status || 200;
+          const responseBody = row.response_body || { success: true, seq: Number(row.seq) };
+
+          this.idempotencyCache.set(participant_id, client_order_id, {
+            payload_hash: row.payload_hash,
+            response_status: responseStatus,
+            response_body: responseBody,
+            seq: Number(row.seq),
+          });
+
+          return { status: responseStatus, body: responseBody };
+        }
+      }
     }
 
-    // 3. Bounded Ingress Queue Check
+    // 4. Bounded Ingress Queue Check
     if (this.queue.length >= this.maxQueueSize) {
       const err = new Error('Sequencer ingress queue is full');
       err.status = 503;
       err.code = 'QUEUE_FULL';
-      return Promise.reject(err);
+      throw err;
     }
 
     return new Promise((resolve, reject) => {
@@ -367,6 +508,11 @@ export class Sequencer extends EventEmitter {
             }
           }
 
+          if (this._faultInjection?.failCommitOnce) {
+            this._faultInjection.failCommitOnce = false;
+            throw new Error('FAULT_INJECTED_BATCH_COMMIT_FAILURE');
+          }
+
           await client.query('COMMIT');
         } catch (dbErr) {
           await client.query('ROLLBACK');
@@ -404,7 +550,22 @@ export class Sequencer extends EventEmitter {
         }
       }
     } catch (err) {
-      // If batch fails, reject all in batch
+      // Fail-stop: reject all commands in that batch with 5xx, refuse new work, rebuild engine from journal
+      this.isRecovering = true;
+      const failErr = new Error(`Batch commit failed: ${err.message}`);
+      failErr.status = 500;
+      failErr.code = 'COMMIT_FAILED';
+
+      try {
+        if (this.pool) {
+          await this._rebuildFromJournal();
+        }
+      } catch (rebuildErr) {
+        this.emit('error', rebuildErr);
+      } finally {
+        this.isRecovering = false;
+      }
+
       for (const item of batch) {
         if (item.command.client_order_id) {
           this.inFlightCommands.delete(
@@ -412,12 +573,12 @@ export class Sequencer extends EventEmitter {
           );
         }
         for (const cb of item.callbacks) {
-          cb.reject(err);
+          cb.reject(failErr);
         }
       }
     } finally {
       this.isFlushing = false;
-      if (this.queue.length > 0) {
+      if (this.queue.length > 0 && !this.isRecovering) {
         this._processBatch();
       }
     }

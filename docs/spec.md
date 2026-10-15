@@ -323,3 +323,15 @@ DirectiveO9 enforces a strict architectural boundary between API schema validati
    - Valid command payloads that fail domain business rules inside the matching engine (e.g., `UNKNOWN_ORDER`, `NOT_OWNER`, `UNKNOWN_INSTRUMENT`, `INVALID_TICK`, `ALREADY_TERMINAL`).
    - These commands ARE assigned a monotonic sequence number (`seq`), ARE processed by the single-writer sequencer, and ARE persisted to the PostgreSQL `commands` and `events` journal alongside an `ORDER_REJECTED` event.
    - **Crucial Invariant**: Sequencer sequence numbers have strictly zero gaps (`seq == previous_seq + 1`). Preserving domain rejections in the durable journal ensures that replaying historical commands reproduces the identical sequence of states and rejection events.
+
+---
+
+## 13. Batch Commit Failure and Fail-Stop State Recovery
+
+If a database transaction failure occurs during the PostgreSQL group-commit phase after the matching engine has applied a batch in memory (such as storage I/O abort, lock timeout, or connection drop):
+
+1. **Fail-Stop**: The sequencer immediately issues `ROLLBACK` on the database transaction and enters recovery mode (`isRecovering = true`).
+2. **Batch Rejection**: All client command promises within the failed batch are rejected with HTTP 500 (`COMMIT_FAILED`). Acknowledgment is never sent for unpersisted commands.
+3. **Refuse Ingress**: While recovery is active, new incoming submissions are refused with HTTP 503 Service Unavailable (`SERVICE_RECOVERING`).
+4. **Journal Rebuild**: The sequencer resets the in-memory engine and replays the durable journal from sequence 1 up to the last committed sequence in PostgreSQL. This wipes unpersisted state changes from memory and reconciles book depth and active order pointers.
+5. **Resume**: Sequence counters and idempotency caches are synchronized with the database, recovery mode is cleared (`isRecovering = false`), and the sequencer resumes normal ingestion.
