@@ -10,7 +10,7 @@ Accepted
 
 DirectiveO9 enforces a strict architectural invariant: **journal-before-ack**. An order command cannot be acknowledged to an API client until it has been durably appended to the database command journal.
 
-Writing commands one-by-one synchronously through PostgreSQL requires a disk flush (`fsync` / `fdatasync`) for every transaction commit when `synchronous_commit = on` (PostgreSQL Documentation, Chapter 30 "Reliability and the Write-Ahead Log"). Sequential individual commits are strictly bound by the storage layer's write and flush latency per transaction.
+Writing commands one-by-one synchronously through PostgreSQL requires a disk flush (`fsync` / `fdatasync`) for every transaction commit when `synchronous_commit = on` (PostgreSQL Official Documentation, Version 16, Chapter 30 "Reliability and the Write-Ahead Log", Section 30.5 "Asynchronous Commit", https://www.postgresql.org/docs/16/wal-async-commit.html). Sequential individual commits are strictly bound by the storage layer's write and flush latency per transaction.
 
 To achieve higher throughput without sacrificing durability guarantees, the sequencer must amortize disk I/O across batches of commands.
 
@@ -36,7 +36,7 @@ Adopt Option 3:
 - Incoming commands are enqueued with their resolution/rejection callbacks.
 - When the batch reaches `BATCH_MAX_SIZE` (default: 100) or `BATCH_TIMEOUT_MS` (default: 5ms) elapses, the sequencer flushes the batch via a parameterized multi-row `INSERT INTO commands (seq, ts, participant_id, client_order_id, type, payload) VALUES ...`.
 - Commands are ordered and sequenced strictly before journal insertion.
-- The default database configuration uses `synchronous_commit = on` to guarantee absolute crash durability (PostgreSQL Official Documentation, Section 20.5.1 "Write-Ahead Log - synchronous_commit" and Section 30.5 "Asynchronous Commit").
+- The default database configuration uses `synchronous_commit = on` to guarantee absolute crash durability (PostgreSQL Official Documentation, Version 16, Section 20.5.1 "Write-Ahead Log - synchronous_commit", https://www.postgresql.org/docs/16/runtime-config-wal.html#GUC-SYNCHRONOUS-COMMIT and Section 30.5 "Asynchronous Commit", https://www.postgresql.org/docs/16/wal-async-commit.html).
 - The `synchronous_commit` level is exposed as a configurable parameter (`on`, `off`, `remote_write`) for benchmarking throughput ceilings.
 
 ## Consequences

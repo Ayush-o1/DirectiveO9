@@ -108,3 +108,16 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
   - Verified benchmark figures linked directly to timestamped results in `bench/results/`.
   - API documentation in `docs/api.md`.
   - Tagging of release `v1.0.0` on `main`.
+
+---
+
+## Known Limitations & Future Architecture
+
+1. **Order Registry Retains Terminal Orders**:
+   - The in-memory matching engine retains all orders (`this.orders` Map) across their entire lifecycle, including after reaching terminal states (`FILLED`, `CANCELLED`, `REJECTED`).
+   - Memory heap scales monotonically with lifetime order count ($O(N)$ heap growth). Future architecture: periodic snapshotting, state compaction, and cold-storage archiving of terminal orders.
+2. **Startup Replay Latency Scales with Journal Length**:
+   - Crash recovery and startup initialization replay all commands sequentially from sequence 1 up to the current sequence ($O(N)$ recovery time).
+   - Future architecture: periodic state snapshots verified by ADR 0002 canonical state hashes to truncate the replay log and bound startup time to the latest checkpoint interval.
+3. **Self-Trade Prevention**:
+   - In MVP, crossing orders from the same participant trade against each other. Production roadmap includes configurable Self-Trade Prevention (STP) policies.

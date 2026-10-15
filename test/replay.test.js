@@ -46,6 +46,7 @@ describe('Deterministic Replay Tool & Verification (Phase 4)', () => {
 
   after(async () => {
     if (server) {
+      server.closeAllConnections?.();
       await new Promise(resolve => server.close(resolve));
     }
     if (sequencer) {

@@ -10,6 +10,7 @@ export class Sequencer extends EventEmitter {
     batchMaxSize = Number(process.env.BATCH_MAX_SIZE || 100),
     batchTimeoutMs = Number(process.env.BATCH_TIMEOUT_MS || 5),
     idempotencyCacheSize = 10000,
+    beforeCommitHook = null,
   } = {}) {
     super();
     this.engine = engine;
@@ -27,7 +28,9 @@ export class Sequencer extends EventEmitter {
     this.flushTimer = null;
     this.isShuttingDown = false;
     this.isRecovering = false;
-    this._faultInjection = null;
+    // Constructor-injected hook for testing transaction aborts and fail-stop recovery.
+    // Strictly validated as a function; cannot be configured via request payloads or environment variables.
+    this._beforeCommitHook = typeof beforeCommitHook === 'function' ? beforeCommitHook : null;
   }
 
   async init() {
@@ -310,6 +313,7 @@ export class Sequencer extends EventEmitter {
           this.flushTimer = null;
           this._processBatch();
         }, this.batchTimeoutMs);
+        this.flushTimer.unref?.();
       }
 
       if (this.queue.length >= this.batchMaxSize && !this.isFlushing) {
@@ -325,6 +329,11 @@ export class Sequencer extends EventEmitter {
   async _processBatch() {
     if (this.isFlushing || this.queue.length === 0) return;
     this.isFlushing = true;
+
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
 
     const batch = this.queue.splice(0, this.batchMaxSize);
     const ts = Date.now();
@@ -508,9 +517,8 @@ export class Sequencer extends EventEmitter {
             }
           }
 
-          if (this._faultInjection?.failCommitOnce) {
-            this._faultInjection.failCommitOnce = false;
-            throw new Error('FAULT_INJECTED_BATCH_COMMIT_FAILURE');
+          if (this._beforeCommitHook) {
+            await this._beforeCommitHook(client, batchProcessed);
           }
 
           await client.query('COMMIT');
@@ -590,7 +598,8 @@ export class Sequencer extends EventEmitter {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
-    while (this.queue.length > 0 || this.isFlushing) {
+    const maxWait = Date.now() + 2000;
+    while ((this.queue.length > 0 || this.isFlushing) && Date.now() < maxWait) {
       if (!this.isFlushing && this.queue.length > 0) {
         await this._processBatch();
       } else {

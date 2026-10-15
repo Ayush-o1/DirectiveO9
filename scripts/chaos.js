@@ -26,7 +26,7 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function startServerProcess(port, adminKey) {
+async function startServerProcess(port, adminKey, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['src/index.js'], {
       cwd: path.resolve(__dirname, '..'),
@@ -34,6 +34,7 @@ async function startServerProcess(port, adminKey) {
         ...process.env,
         PORT: String(port),
         ADMIN_KEY: adminKey,
+        ...extraEnv,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -108,15 +109,15 @@ async function runChaos() {
   const PORT = Number(process.env.CHAOS_PORT || 3300);
   const ADMIN_KEY = process.env.ADMIN_KEY || 'key_admin_test_secret_99';
   const BASE_URL = `http://localhost:${PORT}`;
-  const TOTAL_ROUNDS = Number(process.env.CHAOS_ROUNDS || 20);
+  const TOTAL_ROUNDS = Number(process.env.CHAOS_ROUNDS || 100);
 
   const pool = getPool();
-  process.stdout.write(`[Chaos] Initializing database schema and clean tables...\n`);
+  process.stdout.write(`[Chaos] Initializing clean database schema...\n`);
   await runMigrations({ pool });
   await pool.query('TRUNCATE commands, events, trades, orders, instruments, participants CASCADE');
   await seedDatabase(pool);
 
-  const rng = createPRNG(424242);
+  const rng = createPRNG(133742);
   const participants = [
     { id: 1, key: 'key_mm1_test_secret_1' },
     { id: 2, key: 'key_mm2_test_secret_2' },
@@ -128,23 +129,29 @@ async function runChaos() {
   const roundResults = [];
   let currentChild = null;
 
+  const batchSizeVariants = [5, 10, 25, 50, 100, 200];
+  const batchTimeoutVariants = [1, 2, 5, 8, 10];
+
   try {
     for (let round = 1; round <= TOTAL_ROUNDS; round++) {
-      process.stdout.write(`\n--- [Chaos Round ${round}/${TOTAL_ROUNDS}] ---\n`);
+      // 1. Vary batch settings per round to test diverse flushing schedules
+      const batchMaxSize = batchSizeVariants[Math.floor(rng() * batchSizeVariants.length)];
+      const batchTimeoutMs = batchTimeoutVariants[Math.floor(rng() * batchTimeoutVariants.length)];
 
-      // 1. Start Server Process
-      currentChild = await startServerProcess(PORT, ADMIN_KEY);
-      process.stdout.write(
-        `[Round ${round}] Server started on port ${PORT} (PID ${currentChild.pid})\n`
-      );
+      currentChild = await startServerProcess(PORT, ADMIN_KEY, {
+        BATCH_MAX_SIZE: String(batchMaxSize),
+        BATCH_TIMEOUT_MS: String(batchTimeoutMs),
+      });
 
-      // Wait a moment for TCP readiness
-      await delay(50);
+      await delay(25);
 
-      // 2. Generate and dispatch randomized load
-      const commandCount = 25 + Math.floor(rng() * 25); // 25 to 50 commands
-      const roundPromises = [];
-      const activeRestingOrderIds = [];
+      // 2. Generate heavy randomized load
+      const commandCount = 35 + Math.floor(rng() * 40); // 35 to 75 commands
+      const dispatchedInRound = [];
+      const ackedInThisRound = [];
+      const unackedInThisRound = [];
+
+      const promises = [];
 
       for (let c = 1; c <= commandCount; c++) {
         const p = participants[Math.floor(rng() * participants.length)];
@@ -159,9 +166,8 @@ async function runChaos() {
         const priceOffset = Math.floor(rng() * 10) * tickSize;
         const price =
           side === 'BUY' ? basePrice + priceOffset : basePrice + 5 * tickSize - priceOffset;
-        const quantity = (1 + Math.floor(rng() * 5)) * lotSize;
+        const quantity = (1 + Math.floor(rng() * 6)) * lotSize;
 
-        // Choose command type: LIMIT (70%), MARKET (15%), IOC (15%)
         const roll = rng();
         let cmdType = 'LIMIT';
         if (roll > 0.85) cmdType = 'MARKET';
@@ -178,6 +184,14 @@ async function runChaos() {
           payload.price = Math.max(price, tickSize);
         }
 
+        const cmdRecord = {
+          round,
+          clientOrderId,
+          participant: p,
+          payload,
+        };
+        dispatchedInRound.push(cmdRecord);
+
         const reqPromise = (async () => {
           const res = await sendRequest(BASE_URL, '/orders', {
             method: 'POST',
@@ -186,7 +200,7 @@ async function runChaos() {
           });
 
           if (res.status === 200 || res.status === 201) {
-            allAcknowledgedOrders.push({
+            const ackEntry = {
               round,
               client_order_id: clientOrderId,
               participant_id: p.id,
@@ -194,72 +208,148 @@ async function runChaos() {
               side,
               price: payload.price || null,
               quantity,
+              status: res.status,
+              body: res.body,
               order_id: res.body?.order_id,
               seq: res.body?.seq,
-            });
-            if (res.body?.order_id) {
-              activeRestingOrderIds.push({
-                order_id: res.body.order_id,
-                participant_key: p.key,
-                symbol: sym,
-              });
-            }
+            };
+            ackedInThisRound.push(ackEntry);
+            allAcknowledgedOrders.push(ackEntry);
+          } else {
+            unackedInThisRound.push(cmdRecord);
           }
           return res;
         })();
 
-        roundPromises.push(reqPromise);
+        promises.push(reqPromise);
       }
 
-      // 3. Issue kill -9 at random moment while requests are in flight
-      const killDelayMs = 25 + Math.floor(rng() * 125); // 25ms to 150ms
-      process.stdout.write(
-        `[Round ${round}] Dispatched ${commandCount} commands. Killing PID ${currentChild.pid} with SIGKILL in ${killDelayMs}ms...\n`
-      );
-
+      // 3. Kill -9 at randomized moment while requests are in flight
+      const killDelayMs = 20 + Math.floor(rng() * 110); // 20ms to 130ms
       await delay(killDelayMs);
       await killProcess(currentChild);
-      process.stdout.write(`[Round ${round}] Process killed with SIGKILL (-9).\n`);
+      currentChild = null;
 
-      // Drain in-flight promises (most will fail/terminate)
-      await Promise.allSettled(roundPromises);
+      // Drain in-flight network requests
+      await Promise.allSettled(promises);
 
-      // 4. Restart server
-      const restartStartTime = Date.now();
-      currentChild = await startServerProcess(PORT, ADMIN_KEY);
-      const restartDurationMs = Date.now() - restartStartTime;
-      process.stdout.write(
-        `[Round ${round}] Server restarted successfully on port ${PORT} in ${restartDurationMs}ms (PID ${currentChild.pid})\n`
-      );
+      // 4. Restart Server
+      const restartStart = Date.now();
+      currentChild = await startServerProcess(PORT, ADMIN_KEY, {
+        BATCH_MAX_SIZE: String(batchMaxSize),
+        BATCH_TIMEOUT_MS: String(batchTimeoutMs),
+      });
+      const restartDurationMs = Date.now() - restartStart;
 
-      // 5. Verification
-      // a. Check that every acknowledged order is in the database journal
-      let lostAckedOrders = 0;
-      for (const acked of allAcknowledgedOrders) {
-        const { rows } = await pool.query(
-          `SELECT seq, command_type, participant_id, client_order_id, symbol, side, price, quantity, status
+      // 5. Verification:
+      // a. Compare each acknowledged response with stored journal events
+      let ackedResponseMismatches = 0;
+      for (const acked of ackedInThisRound) {
+        const { rows: cmdRows } = await pool.query(
+          `SELECT seq, status, response_status, response_body
            FROM commands
            WHERE participant_id = $1 AND client_order_id = $2`,
           [acked.participant_id, acked.client_order_id]
         );
-        if (rows.length === 0) {
+
+        if (cmdRows.length === 0) {
+          ackedResponseMismatches++;
           process.stderr.write(
-            `[CRITICAL] Lost acknowledged order! client_order_id=${acked.client_order_id}, participant=${acked.participant_id}\n`
+            `[Ack Mismatch] Acknowledged order missing from journal: ${acked.client_order_id}\n`
           );
-          lostAckedOrders++;
+          continue;
+        }
+
+        const cmd = cmdRows[0];
+        if (Number(cmd.response_status) !== Number(acked.status)) {
+          ackedResponseMismatches++;
+          process.stderr.write(
+            `[Ack Mismatch] Status mismatch for ${acked.client_order_id}: acked=${acked.status}, journal=${cmd.response_status}\n`
+          );
+        }
+
+        // Verify stored events match order events returned in response
+        const { rows: evRows } = await pool.query(
+          `SELECT event_type, payload FROM events WHERE seq = $1 ORDER BY event_id ASC`,
+          [cmd.seq]
+        );
+
+        const expectedEvents = acked.body?.events || [];
+        if (evRows.length !== expectedEvents.length) {
+          ackedResponseMismatches++;
+          process.stderr.write(
+            `[Ack Mismatch] Event count mismatch for ${acked.client_order_id}: acked=${expectedEvents.length}, db=${evRows.length}\n`
+          );
+        } else {
+          for (let i = 0; i < evRows.length; i++) {
+            if (evRows[i].event_type !== expectedEvents[i].event) {
+              ackedResponseMismatches++;
+              process.stderr.write(
+                `[Ack Mismatch] Event type mismatch at [${i}] for ${acked.client_order_id}: db=${evRows[i].event_type}, acked=${expectedEvents[i].event}\n`
+              );
+            }
+          }
+        }
+
+        const ackedTrades = expectedEvents.filter(e => e.event === 'TRADE_EXECUTED');
+        if (ackedTrades.length > 0) {
+          const { rows: dbTrades } = await pool.query(
+            `SELECT price, quantity, maker_order_id, taker_order_id FROM trades WHERE seq = $1 ORDER BY trade_id ASC`,
+            [cmd.seq]
+          );
+          if (dbTrades.length !== ackedTrades.length) {
+            ackedResponseMismatches++;
+            process.stderr.write(
+              `[Ack Mismatch] Trade count mismatch for ${acked.client_order_id}: acked=${ackedTrades.length}, db=${dbTrades.length}\n`
+            );
+          }
         }
       }
 
-      // b. Check sequence gap-freedom
+      // b. Retry every unacknowledged command with the same client_order_id
+      let unackedRetriedCount = 0;
+      let idempotencyViolations = 0;
+      for (const unacked of unackedInThisRound) {
+        unackedRetriedCount++;
+        const retryRes = await sendRequest(BASE_URL, '/orders', {
+          method: 'POST',
+          headers: { 'X-API-Key': unacked.participant.key },
+          body: JSON.stringify(unacked.payload),
+        });
+
+        // Verify valid response received on retry
+        if (retryRes.status !== 200 && retryRes.status !== 201 && retryRes.status !== 422) {
+          idempotencyViolations++;
+          process.stderr.write(
+            `[Retry Failure] Retry failed with status ${retryRes.status} for ${unacked.clientOrderId}\n`
+          );
+        }
+
+        // Verify EXACTLY ONE entry exists in commands journal for this client_order_id
+        const { rows: countRows } = await pool.query(
+          `SELECT COUNT(*) AS count FROM commands WHERE participant_id = $1 AND client_order_id = $2`,
+          [unacked.participant.id, unacked.clientOrderId]
+        );
+        const orderCount = Number(countRows[0]?.count || 0);
+        if (orderCount !== 1) {
+          idempotencyViolations++;
+          process.stderr.write(
+            `[Idempotency Violation] Expected 1 journal row for ${unacked.clientOrderId}, found ${orderCount}\n`
+          );
+        }
+      }
+
+      // c. Check sequence gap-freedom
       const { rows: seqRows } = await pool.query(
         'SELECT MIN(seq) AS min_seq, MAX(seq) AS max_seq, COUNT(*) AS count FROM commands'
       );
       const minSeq = Number(seqRows[0]?.min_seq || 0);
       const maxSeq = Number(seqRows[0]?.max_seq || 0);
-      const count = Number(seqRows[0]?.count || 0);
-      const isGapFree = count === 0 || (minSeq === 1 && count === maxSeq - minSeq + 1);
+      const totalJournalCmds = Number(seqRows[0]?.count || 0);
+      const isGapFree =
+        totalJournalCmds === 0 || (minSeq === 1 && totalJournalCmds === maxSeq - minSeq + 1);
 
-      // c. State hash equals a fresh replay
+      // d. State hash equals fresh replay AND verified against naive oracle
       const verifyRes = await sendRequest(BASE_URL, '/admin/verify', {
         headers: { 'X-Admin-Key': ADMIN_KEY },
       });
@@ -268,76 +358,107 @@ async function runChaos() {
       const replayRes = await sendRequest(BASE_URL, '/admin/replay', {
         method: 'POST',
         headers: { 'X-Admin-Key': ADMIN_KEY },
-        body: JSON.stringify({ from_seq: 1, oracle: false }),
+        body: JSON.stringify({ from_seq: 1, oracle: true }),
       });
       const replayHash = replayRes.body?.state_hash;
-
+      const oracleVerified = Boolean(replayRes.body?.oracle_verified && replayRes.body?.verified);
       const hashMatched = Boolean(liveHash && replayHash && liveHash === replayHash);
 
-      const roundSuccess = lostAckedOrders === 0 && isGapFree && hashMatched;
-
-      process.stdout.write(
-        `[Round ${round} Summary]\n` +
-          `  Acked Orders (Cumulative): ${allAcknowledgedOrders.length}\n` +
-          `  Lost Acked Orders:         ${lostAckedOrders}\n` +
-          `  Journal Total Commands:    ${count} (min=${minSeq}, max=${maxSeq})\n` +
-          `  Gap-Free Sequence:         ${isGapFree}\n` +
-          `  Live Canonical Hash:       ${liveHash}\n` +
-          `  Replay State Hash:         ${replayHash}\n` +
-          `  Hash Match:                ${hashMatched}\n` +
-          `  Round Status:              ${roundSuccess ? 'PASSED' : 'FAILED'}\n`
-      );
+      const roundSuccess =
+        ackedResponseMismatches === 0 &&
+        idempotencyViolations === 0 &&
+        isGapFree &&
+        hashMatched &&
+        oracleVerified;
 
       roundResults.push({
         round,
+        batch_max_size: batchMaxSize,
+        batch_timeout_ms: batchTimeoutMs,
         commands_dispatched: commandCount,
-        acked_cumulative: allAcknowledgedOrders.length,
-        lost_acked_orders: lostAckedOrders,
-        db_commands_count: count,
+        acked_in_round: ackedInThisRound.length,
+        unacked_retried: unackedRetriedCount,
+        ack_mismatches: ackedResponseMismatches,
+        idempotency_violations: idempotencyViolations,
+        total_journal_commands: totalJournalCmds,
         min_seq: minSeq,
         max_seq: maxSeq,
         gap_free: isGapFree,
         live_hash: liveHash,
         replay_hash: replayHash,
         hash_matched: hashMatched,
+        oracle_verified: oracleVerified,
         kill_delay_ms: killDelayMs,
         restart_duration_ms: restartDurationMs,
         passed: roundSuccess,
       });
 
+      if (round % 10 === 0 || !roundSuccess) {
+        process.stdout.write(
+          `[Round ${round}/${TOTAL_ROUNDS}] Batch(${batchMaxSize},${batchTimeoutMs}ms) | ` +
+            `Dispatched: ${commandCount} | Acked: ${ackedInThisRound.length} | Retried: ${unackedRetriedCount} | ` +
+            `Journal: ${totalJournalCmds} (seq [${minSeq}..${maxSeq}]) | Gap-Free: ${isGapFree} | ` +
+            `Oracle: ${oracleVerified} | HashMatch: ${hashMatched} | Status: ${roundSuccess ? 'PASSED' : 'FAILED'}\n`
+        );
+      }
+
       if (!roundSuccess) {
         throw new Error(`Chaos round ${round} verification failed!`);
       }
 
-      // Cleanly stop child before next round iteration starts
+      // Stop child process before next round
       await killProcess(currentChild);
       currentChild = null;
     }
 
-    // Write results to bench/results/chaos-kill-<timestamp>.json
+    // Write results to bench/results/chaos-kill-100-rounds-<timestamp>.json
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const resultsDir = path.resolve(__dirname, '..', 'bench', 'results');
     await fs.mkdir(resultsDir, { recursive: true });
-    const resultsFile = path.join(resultsDir, `chaos-kill-${timestamp}.json`);
+    const resultsFile = path.join(resultsDir, `chaos-kill-100-rounds-${timestamp}.json`);
 
     const summaryData = {
       timestamp: new Date().toISOString(),
       total_rounds: TOTAL_ROUNDS,
       passed_rounds: roundResults.filter(r => r.passed).length,
       failed_rounds: roundResults.filter(r => !r.passed).length,
-      total_acknowledged_orders: allAcknowledgedOrders.length,
-      lost_acknowledged_orders: roundResults.reduce((acc, r) => acc + r.lost_acked_orders, 0),
-      gap_free_all_rounds: roundResults.every(r => r.gap_free),
-      hashes_matched_all_rounds: roundResults.every(r => r.hash_matched),
+      total_commands_dispatched: roundResults.reduce((acc, r) => acc + r.commands_dispatched, 0),
+      total_unacknowledged_retried: roundResults.reduce((acc, r) => acc + r.unacked_retried, 0),
+      total_journal_commands: roundResults[roundResults.length - 1]?.total_journal_commands || 0,
+      total_ack_mismatches: roundResults.reduce((acc, r) => acc + r.ack_mismatches, 0),
+      total_idempotency_violations: roundResults.reduce(
+        (acc, r) => acc + r.idempotency_violations,
+        0
+      ),
+      all_rounds_gap_free: roundResults.every(r => r.gap_free),
+      all_rounds_hash_matched: roundResults.every(r => r.hash_matched),
+      all_rounds_oracle_verified: roundResults.every(r => r.oracle_verified),
       rounds: roundResults,
     };
 
+    // Scrub any local path references before saving
     await fs.writeFile(resultsFile, JSON.stringify(summaryData, null, 2), 'utf-8');
     process.stdout.write(`\n=======================================================\n`);
     process.stdout.write(
-      `CHAOS KILL TESTING COMPLETE: ${summaryData.passed_rounds}/${TOTAL_ROUNDS} ROUNDS PASSED\n`
+      `CHAOS TESTING COMPLETE: ${summaryData.passed_rounds}/${TOTAL_ROUNDS} ROUNDS PASSED (0 FAILURES)\n`
     );
-    process.stdout.write(`Results written to: ${resultsFile}\n`);
+    process.stdout.write(
+      `Total Dispatched Commands:       ${summaryData.total_commands_dispatched}\n`
+    );
+    process.stdout.write(
+      `Unacknowledged Retries Tested:   ${summaryData.total_unacknowledged_retried}\n`
+    );
+    process.stdout.write(
+      `Total Committed Journal Cmds:    ${summaryData.total_journal_commands}\n`
+    );
+    process.stdout.write(
+      `Oracle Verified Across Rounds:   ${summaryData.all_rounds_oracle_verified}\n`
+    );
+    process.stdout.write(
+      `State Hashes Matched All Rounds: ${summaryData.all_rounds_hash_matched}\n`
+    );
+    process.stdout.write(`Gap-Free Sequences All Rounds:   ${summaryData.all_rounds_gap_free}\n`);
+    process.stdout.write(`Results saved to: bench/results/${path.basename(resultsFile)}\n`);
     process.stdout.write(`=======================================================\n`);
   } finally {
     if (currentChild) {
