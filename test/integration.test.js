@@ -713,6 +713,11 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
       // Aborted as expected
     } finally {
       clearTimeout(readTimeout);
+      try {
+        await reader.cancel();
+      } catch {
+        // Ignore abort error
+      }
       controller.abort();
     }
 

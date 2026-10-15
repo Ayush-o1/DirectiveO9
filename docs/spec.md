@@ -335,3 +335,29 @@ If a database transaction failure occurs during the PostgreSQL group-commit phas
 3. **Refuse Ingress**: While recovery is active, new incoming submissions are refused with HTTP 503 Service Unavailable (`SERVICE_RECOVERING`).
 4. **Journal Rebuild**: The sequencer resets the in-memory engine and replays the durable journal from sequence 1 up to the last committed sequence in PostgreSQL. This wipes unpersisted state changes from memory and reconciles book depth and active order pointers.
 5. **Resume**: Sequence counters and idempotency caches are synchronized with the database, recovery mode is cleared (`isRecovering = false`), and the sequencer resumes normal ingestion.
+
+---
+
+## 14. Write-Ahead Logging & the `synchronous_commit` Durability Trade-Off
+
+DirectiveO9 relies on PostgreSQL write-ahead logging (WAL) for durability and disaster recovery. PostgreSQL provides a runtime configuration parameter, `synchronous_commit`, which governs whether a transaction commit waits for WAL records to be physically flushed to persistent disk storage before returning success to the application.
+
+### Primary Source Citations
+
+1. **PostgreSQL Official Documentation**, Chapter 30: _Reliability and the Write-Ahead Log_, Section 30.5: _Asynchronous Commit_. URL: https://www.postgresql.org/docs/current/wal-async-commit.html
+2. **PostgreSQL Official Documentation**, Chapter 20: _Server Configuration_, Section 20.5.1: _Write-Ahead Log (WAL) - synchronous_commit_. URL: https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-SYNCHRONOUS-COMMIT
+
+### The Engineering Trade-Off
+
+| Mode                                                   | Durability Guarantee                                                                                                                                               | Write Latency                                                                                 | Throughput Profile                                                                 | Failure Behavior                                                                                                                                                                                                   |
+| :----------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`synchronous_commit = on`** _(DirectiveO9 Default)_  | **Strict Durability (Zero Data Loss, RPO = 0)**. A committed transaction is guaranteed to survive an operating system crash, sudden power outage, or process kill. | **Bound by Disk I/O**. Each commit blocks on physical `fsync`/`fdatasync` to disk.            | Lower per-transaction throughput unless amortized via group-commit micro-batching. | In a crash, every acknowledged command exists in the WAL and is fully recovered on restart.                                                                                                                        |
+| **`synchronous_commit = off`** _(Asynchronous Commit)_ | **Bounded Window Loss (RPO > 0)**. Commits return immediately after WAL records are written to memory buffers, before physical disk flush.                         | **Sub-millisecond**. Commits return at memory speed without blocking on disk synchronization. | Up to 3x–5x higher throughput under disk-constrained workloads.                    | In a sudden OS crash or power cut, recent transactions within `wal_writer_delay * 3` (up to ~600ms) can be lost. Database internal consistency is preserved, but previously acknowledged client orders may vanish. |
+
+### Architectural Choice in DirectiveO9
+
+DirectiveO9 strictly mandates `synchronous_commit = on` as its operational default:
+
+- **Journal-Before-Ack Compliance**: DirectiveO9's core contract is that an acknowledgment to a market participant guarantees deterministic recoverability. If `synchronous_commit = off` were used, an unexpected crash could acknowledge an order that subsequently disappears upon restart, permanently corrupting client trust and violating financial auditability.
+- **Micro-Batch Amortization**: Rather than weakening durability to achieve performance, DirectiveO9 resolves the disk latency bottleneck through **group commit micro-batching** in `Sequencer`. The sequencer coalesces up to `BATCH_MAX_SIZE` commands (or waits up to `BATCH_TIMEOUT_MS = 5ms`) and commits them in a single multi-row database transaction. This amortizes the physical `fsync` cost across dozens or hundreds of orders simultaneously, yielding high throughput while strictly maintaining `synchronous_commit = on`.
+- **Benchmarking Benchmark Ceiling**: The benchmark harness supports overriding `synchronous_commit = off` solely for measuring in-memory engine and serialization throughput ceilings without storage hardware constraints.
