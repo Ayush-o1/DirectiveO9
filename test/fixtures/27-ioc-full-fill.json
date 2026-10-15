@@ -1,0 +1,87 @@
+{
+  "name": "27-ioc-full-fill",
+  "description": "Immediate-Or-Cancel (IOC) order matches fully against resting ask",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "LIMIT",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "SELL",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "IOC",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 2,
+      "ts": 1001
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 100,
+      "quantity": 10,
+      "remaining_qty": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "event": "TRADE_EXECUTED",
+      "trade_id": 1,
+      "symbol": "BTC-USDT",
+      "price": 100,
+      "quantity": 10,
+      "maker_order_id": 1,
+      "taker_order_id": 2,
+      "maker_participant_id": 101,
+      "taker_participant_id": 102,
+      "taker_side": "BUY",
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 100,
+      "filled_qty": 10,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 2,
+      "participant_id": 102,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": 100,
+      "filled_qty": 10,
+      "seq": 2,
+      "ts": 1001
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": null,
+    "depth": {
+      "bids": [],
+      "asks": []
+    }
+  }
+}

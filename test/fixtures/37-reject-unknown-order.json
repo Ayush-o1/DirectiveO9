@@ -1,0 +1,34 @@
+{
+  "name": "37-reject-unknown-order",
+  "description": "Cancel command targeting unknown order_id is rejected with UNKNOWN_ORDER",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "CANCEL",
+      "order_id": 999,
+      "participant_id": 101,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_REJECTED",
+      "code": "UNKNOWN_ORDER",
+      "order_id": 999,
+      "participant_id": 101,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": null,
+    "depth": {
+      "bids": [],
+      "asks": []
+    }
+  }
+}

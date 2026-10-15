@@ -1,0 +1,88 @@
+{
+  "name": "32-sweep-and-rest-new-best-level",
+  "description": "Crossing limit sweeps all opposite liquidity and its remainder establishes new best bid level",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "LIMIT",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "SELL",
+      "price": 101,
+      "quantity": 5,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "LIMIT",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 103,
+      "quantity": 12,
+      "seq": 2,
+      "ts": 1001
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 101,
+      "quantity": 5,
+      "remaining_qty": 5,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "event": "TRADE_EXECUTED",
+      "trade_id": 1,
+      "symbol": "BTC-USDT",
+      "price": 101,
+      "quantity": 5,
+      "maker_order_id": 1,
+      "taker_order_id": 2,
+      "maker_participant_id": 101,
+      "taker_participant_id": 102,
+      "taker_side": "BUY",
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "event": "ORDER_FILLED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "SELL",
+      "price": 101,
+      "filled_qty": 5,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": 103,
+      "quantity": 12,
+      "remaining_qty": 7,
+      "seq": 2,
+      "ts": 1001
+    }
+  ],
+  "expected_book": {
+    "best_bid": { "price": 103, "total_volume": 7, "order_count": 1 },
+    "best_ask": null,
+    "depth": {
+      "bids": [{ "price": 103, "quantity": 7, "order_count": 1 }],
+      "asks": []
+    }
+  }
+}

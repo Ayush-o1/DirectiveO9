@@ -1,0 +1,41 @@
+{
+  "name": "26-market-order-empty-book",
+  "description": "MARKET order submitted to an empty book executes zero trades and immediately cancels",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "MARKET",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_CANCELLED",
+      "order_id": 1,
+      "participant_id": 101,
+      "symbol": "BTC-USDT",
+      "side": "BUY",
+      "price": null,
+      "original_qty": 10,
+      "remaining_qty": 10,
+      "reason": "MARKET_UNFILLED",
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": null,
+    "depth": {
+      "bids": [],
+      "asks": []
+    }
+  }
+}
