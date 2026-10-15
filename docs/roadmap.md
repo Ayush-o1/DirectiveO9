@@ -4,7 +4,7 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
 
 ---
 
-## Phase 0: Foundation
+## Phase 0: Foundation [Completed]
 
 - **Objective**: Establish development tooling, CI pipeline, directory structure, specification, and decision records.
 - **Deliverables**:
@@ -19,7 +19,7 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
 
 ---
 
-## Phase 1: Book Core
+## Phase 1: Book Core [Completed]
 
 - **Objective**: Implement the deterministic single-symbol order book data structures and depth projection.
 - **Deliverables**:
@@ -28,7 +28,7 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
   - Order book state management for bids and asks (`src/engine/book.js`).
   - Core book operations: insert resting order, cancel resting order, query best bid/ask, compute L2 depth snapshots.
   - Unit test suite for queue manipulation, edge-case pointer unlinking, and level lifecycle.
-  - 15 language-neutral JSON golden scenario fixtures in `test/fixtures/` verifying command inputs against expected book states and events.
+  - 16 language-neutral JSON golden scenario fixtures in `test/fixtures/` verifying command inputs against expected book states and events.
 
 ---
 

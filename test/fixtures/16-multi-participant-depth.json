@@ -1,0 +1,141 @@
+{
+  "name": "16-multi-participant-depth",
+  "description": "Populates a multi-level depth book with 3 bid levels and 3 ask levels from distinct participants",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 99,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "ADD",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 98,
+      "quantity": 20,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "ADD",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 97,
+      "quantity": 30,
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "type": "ADD",
+      "order_id": 4,
+      "participant_id": 104,
+      "side": "SELL",
+      "price": 101,
+      "quantity": 15,
+      "seq": 4,
+      "ts": 1003
+    },
+    {
+      "type": "ADD",
+      "order_id": 5,
+      "participant_id": 105,
+      "side": "SELL",
+      "price": 102,
+      "quantity": 25,
+      "seq": 5,
+      "ts": 1004
+    },
+    {
+      "type": "ADD",
+      "order_id": 6,
+      "participant_id": 106,
+      "side": "SELL",
+      "price": 103,
+      "quantity": 35,
+      "seq": 6,
+      "ts": 1005
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 99,
+      "quantity": 10,
+      "seq": 1
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 98,
+      "quantity": 20,
+      "seq": 2
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 97,
+      "quantity": 30,
+      "seq": 3
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 4,
+      "participant_id": 104,
+      "side": "SELL",
+      "price": 101,
+      "quantity": 15,
+      "seq": 4
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 5,
+      "participant_id": 105,
+      "side": "SELL",
+      "price": 102,
+      "quantity": 25,
+      "seq": 5
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 6,
+      "participant_id": 106,
+      "side": "SELL",
+      "price": 103,
+      "quantity": 35,
+      "seq": 6
+    }
+  ],
+  "expected_book": {
+    "best_bid": { "price": 99, "total_volume": 10, "order_count": 1 },
+    "best_ask": { "price": 101, "total_volume": 15, "order_count": 1 },
+    "depth": {
+      "bids": [
+        { "price": 99, "quantity": 10, "order_count": 1 },
+        { "price": 98, "quantity": 20, "order_count": 1 },
+        { "price": 97, "quantity": 30, "order_count": 1 }
+      ],
+      "asks": [
+        { "price": 101, "quantity": 15, "order_count": 1 },
+        { "price": 102, "quantity": 25, "order_count": 1 },
+        { "price": 103, "quantity": 35, "order_count": 1 }
+      ]
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "name": "15-full-lifecycle-to-empty-book",
+  "description": "Places multiple bids and asks and cancels all of them, restoring empty book state",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "ADD",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 105,
+      "quantity": 12,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "CANCEL",
+      "order_id": 1,
+      "participant_id": 101,
+      "seq": 3,
+      "ts": 1002
+    },
+    {
+      "type": "CANCEL",
+      "order_id": 2,
+      "participant_id": 102,
+      "seq": 4,
+      "ts": 1003
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 10,
+      "seq": 1
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 105,
+      "quantity": 12,
+      "seq": 2
+    },
+    {
+      "event": "ORDER_CANCELLED",
+      "order_id": 1,
+      "participant_id": 101,
+      "price": 100,
+      "remaining_qty": 10,
+      "side": "BUY",
+      "seq": 3
+    },
+    {
+      "event": "ORDER_CANCELLED",
+      "order_id": 2,
+      "participant_id": 102,
+      "price": 105,
+      "remaining_qty": 12,
+      "side": "SELL",
+      "seq": 4
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": null,
+    "depth": {
+      "bids": [],
+      "asks": []
+    }
+  }
+}

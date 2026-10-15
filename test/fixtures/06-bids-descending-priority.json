@@ -1,0 +1,80 @@
+{
+  "name": "06-bids-descending-priority",
+  "description": "Places bids at prices 98, 102, 100 and verifies sorted descending priority",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 98,
+      "quantity": 10,
+      "seq": 1,
+      "ts": 1000
+    },
+    {
+      "type": "ADD",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 102,
+      "quantity": 5,
+      "seq": 2,
+      "ts": 1001
+    },
+    {
+      "type": "ADD",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 8,
+      "seq": 3,
+      "ts": 1002
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 101,
+      "side": "BUY",
+      "price": 98,
+      "quantity": 10,
+      "seq": 1
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 2,
+      "participant_id": 102,
+      "side": "BUY",
+      "price": 102,
+      "quantity": 5,
+      "seq": 2
+    },
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 3,
+      "participant_id": 103,
+      "side": "BUY",
+      "price": 100,
+      "quantity": 8,
+      "seq": 3
+    }
+  ],
+  "expected_book": {
+    "best_bid": { "price": 102, "total_volume": 5, "order_count": 1 },
+    "best_ask": null,
+    "depth": {
+      "bids": [
+        { "price": 102, "quantity": 5, "order_count": 1 },
+        { "price": 100, "quantity": 8, "order_count": 1 },
+        { "price": 98, "quantity": 10, "order_count": 1 }
+      ],
+      "asks": []
+    }
+  }
+}

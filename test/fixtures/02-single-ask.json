@@ -1,0 +1,38 @@
+{
+  "name": "02-single-ask",
+  "description": "Places a single ask order on an empty book",
+  "symbol": "BTC-USDT",
+  "tick_size": 1,
+  "lot_size": 1,
+  "commands": [
+    {
+      "type": "ADD",
+      "order_id": 1,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 105,
+      "quantity": 15,
+      "seq": 1,
+      "ts": 1000
+    }
+  ],
+  "expected_events": [
+    {
+      "event": "ORDER_ACCEPTED",
+      "order_id": 1,
+      "participant_id": 102,
+      "side": "SELL",
+      "price": 105,
+      "quantity": 15,
+      "seq": 1
+    }
+  ],
+  "expected_book": {
+    "best_bid": null,
+    "best_ask": { "price": 105, "total_volume": 15, "order_count": 1 },
+    "depth": {
+      "bids": [],
+      "asks": [{ "price": 105, "quantity": 15, "order_count": 1 }]
+    }
+  }
+}
