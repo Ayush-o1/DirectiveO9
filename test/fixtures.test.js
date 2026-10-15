@@ -31,9 +31,7 @@ describe('Golden Scenario Fixtures', () => {
       );
 
       if (isMatchingFixture) {
-        const targetIndices = process.env.INDEX_TYPE
-          ? [process.env.INDEX_TYPE]
-          : ['array', 'avl'];
+        const targetIndices = process.env.INDEX_TYPE ? [process.env.INDEX_TYPE] : ['array', 'avl'];
         for (const indexType of targetIndices) {
           const engine = new MatchingEngine({
             instruments: [

@@ -88,7 +88,10 @@ function extractCaughtBy(output) {
 
   // Generic assertion or failure line
   const lines = output.split('\n');
-  const failLine = lines.find(l => l.includes('AssertionError') || (l.includes('✖') && !l.includes('Golden Scenario Fixtures')));
+  const failLine = lines.find(
+    l =>
+      l.includes('AssertionError') || (l.includes('✖') && !l.includes('Golden Scenario Fixtures'))
+  );
   if (failLine) {
     return failLine.trim().slice(0, 48);
   }
@@ -115,7 +118,9 @@ async function runMutationChecks() {
       symlinkSync(join(ROOT_DIR, 'node_modules'), join(tempSandbox, 'node_modules'), 'junction');
     } catch {
       // If symlink fails, copy
-      cpSync(join(ROOT_DIR, 'node_modules'), join(tempSandbox, 'node_modules'), { recursive: true });
+      cpSync(join(ROOT_DIR, 'node_modules'), join(tempSandbox, 'node_modules'), {
+        recursive: true,
+      });
     }
 
     const results = [];
@@ -172,9 +177,15 @@ async function runMutationChecks() {
     }
 
     // Display formatted results table
-    console.log('┌─────┬─────────────────────────────┬─────────────────────┬───────────┬────────┬──────────────────────────────────────────────────┐');
-    console.log('│ Bug │ Mutation Description        │ Target File         │ IndexType │ Caught │ Caught By                                        │');
-    console.log('├─────┼─────────────────────────────┼─────────────────────┼───────────┼────────┼──────────────────────────────────────────────────┤');
+    console.log(
+      '┌─────┬─────────────────────────────┬─────────────────────┬───────────┬────────┬──────────────────────────────────────────────────┐'
+    );
+    console.log(
+      '│ Bug │ Mutation Description        │ Target File         │ IndexType │ Caught │ Caught By                                        │'
+    );
+    console.log(
+      '├─────┼─────────────────────────────┼─────────────────────┼───────────┼────────┼──────────────────────────────────────────────────┤'
+    );
 
     for (const r of results) {
       const id = String(r.id).padEnd(3, ' ');
@@ -186,10 +197,14 @@ async function runMutationChecks() {
       console.log(`│ #${id} │ ${name} │ ${file} │ ${idx} │ ${caught} │ ${caughtBy} │`);
     }
 
-    console.log('└─────┴─────────────────────────────┴─────────────────────┴───────────┴────────┴──────────────────────────────────────────────────┘\n');
+    console.log(
+      '└─────┴─────────────────────────────┴─────────────────────┴───────────┴────────┴──────────────────────────────────────────────────┘\n'
+    );
 
     if (allCaught) {
-      console.log(`✓ All 8 mutations were successfully detected and caught for indexType: ${INDEX_TYPE}.\n`);
+      console.log(
+        `✓ All 8 mutations were successfully detected and caught for indexType: ${INDEX_TYPE}.\n`
+      );
       process.exit(0);
     } else {
       console.error(`✖ One or more mutations ESCAPED for indexType: ${INDEX_TYPE}!\n`);

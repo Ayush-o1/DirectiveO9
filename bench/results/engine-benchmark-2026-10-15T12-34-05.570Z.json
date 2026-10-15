@@ -1,0 +1,242 @@
+{
+  "benchmark": "engine_benchmark",
+  "timestamp": "2026-10-15T12:34:05.571Z",
+  "timer_overhead_ns": {
+    "count": 100000,
+    "min": 0,
+    "max": 24209,
+    "mean": 12.52,
+    "median": 0,
+    "p50": 0,
+    "p95": 42,
+    "p99": 42,
+    "spread": 24209,
+    "stddev": 105.93
+  },
+  "environment": {
+    "node_version": "v24.21.0",
+    "cpu_model": "Apple M4",
+    "cpu_count": 10,
+    "total_memory_bytes": 17179869184,
+    "total_memory_gb": 16,
+    "os_type": "Darwin",
+    "os_platform": "darwin",
+    "os_release": "27.0.0",
+    "os_arch": "arm64",
+    "git_commit": "8473e2c2fdf8c6e895f313fb8696cb107fa1f6c4",
+    "git_dirty": false,
+    "thermal_throttling_note": "Fanless laptop architecture (Apple Silicon); prolonged execution is susceptible to thermal throttling. Repetitions (>= 5 runs) report median and spread (max - min) to mitigate transient frequency scaling."
+  },
+  "results": [
+    {
+      "scenario": "Shallow Book (Depth 10)",
+      "data_structure": "sorted-array",
+      "book_depth": 10,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1456116,
+        "min": 1131791,
+        "max": 1490805,
+        "spread": 359014
+      },
+      "latency_p50_ns": {
+        "median": 500,
+        "min": 417,
+        "max": 625,
+        "spread": 208
+      },
+      "latency_p95_ns": {
+        "median": 1458,
+        "min": 1208,
+        "max": 1583,
+        "spread": 375
+      },
+      "latency_p99_ns": {
+        "median": 2250,
+        "min": 1958,
+        "max": 2417,
+        "spread": 459
+      },
+      "latency_mean_ns": {
+        "median": 642.45,
+        "spread": 211.79
+      }
+    },
+    {
+      "scenario": "Shallow Book (Depth 10)",
+      "data_structure": "avl-tree",
+      "book_depth": 10,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1220576,
+        "min": 948983,
+        "max": 1250602,
+        "spread": 301619
+      },
+      "latency_p50_ns": {
+        "median": 542,
+        "min": 500,
+        "max": 667,
+        "spread": 167
+      },
+      "latency_p95_ns": {
+        "median": 1916,
+        "min": 1833,
+        "max": 2334,
+        "spread": 501
+      },
+      "latency_p99_ns": {
+        "median": 3250,
+        "min": 3042,
+        "max": 4000,
+        "spread": 958
+      },
+      "latency_mean_ns": {
+        "median": 770.44,
+        "spread": 219.62
+      }
+    },
+    {
+      "scenario": "Medium Book (Depth 500)",
+      "data_structure": "sorted-array",
+      "book_depth": 500,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1269307,
+        "min": 1210903,
+        "max": 1304660,
+        "spread": 93757
+      },
+      "latency_p50_ns": {
+        "median": 584,
+        "min": 583,
+        "max": 666,
+        "spread": 83
+      },
+      "latency_p95_ns": {
+        "median": 1541,
+        "min": 1458,
+        "max": 1625,
+        "spread": 167
+      },
+      "latency_p99_ns": {
+        "median": 2417,
+        "min": 2250,
+        "max": 2833.01,
+        "spread": 583.01
+      },
+      "latency_mean_ns": {
+        "median": 741.49,
+        "spread": 62.08
+      }
+    },
+    {
+      "scenario": "Medium Book (Depth 500)",
+      "data_structure": "avl-tree",
+      "book_depth": 500,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1121311,
+        "min": 1102588,
+        "max": 1165777,
+        "spread": 63189
+      },
+      "latency_p50_ns": {
+        "median": 583,
+        "min": 583,
+        "max": 584,
+        "spread": 1
+      },
+      "latency_p95_ns": {
+        "median": 2042,
+        "min": 2000,
+        "max": 2375,
+        "spread": 375
+      },
+      "latency_p99_ns": {
+        "median": 3750,
+        "min": 3375,
+        "max": 4042,
+        "spread": 667
+      },
+      "latency_mean_ns": {
+        "median": 838.13,
+        "spread": 46.55
+      }
+    },
+    {
+      "scenario": "Deep Book (Depth 5000)",
+      "data_structure": "sorted-array",
+      "book_depth": 5000,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 1105832,
+        "min": 1074477,
+        "max": 1200370,
+        "spread": 125892
+      },
+      "latency_p50_ns": {
+        "median": 709,
+        "min": 625,
+        "max": 709,
+        "spread": 84
+      },
+      "latency_p95_ns": {
+        "median": 1750,
+        "min": 1625,
+        "max": 1833,
+        "spread": 208
+      },
+      "latency_p99_ns": {
+        "median": 2625,
+        "min": 2542,
+        "max": 2834,
+        "spread": 292
+      },
+      "latency_mean_ns": {
+        "median": 857.35,
+        "spread": 93.55
+      }
+    },
+    {
+      "scenario": "Deep Book (Depth 5000)",
+      "data_structure": "avl-tree",
+      "book_depth": 5000,
+      "command_count": 25000,
+      "runs": 5,
+      "throughput_ops_sec": {
+        "median": 970696,
+        "min": 918842,
+        "max": 1327886,
+        "spread": 409044
+      },
+      "latency_p50_ns": {
+        "median": 750,
+        "min": 625,
+        "max": 833,
+        "spread": 208
+      },
+      "latency_p95_ns": {
+        "median": 2042,
+        "min": 1333,
+        "max": 2458,
+        "spread": 1125
+      },
+      "latency_p99_ns": {
+        "median": 3542,
+        "min": 2000,
+        "max": 4042,
+        "spread": 2042
+      },
+      "latency_mean_ns": {
+        "median": 975.82,
+        "spread": 335.81
+      }
+    }
+  ]
+}

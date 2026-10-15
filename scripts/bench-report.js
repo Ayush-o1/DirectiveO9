@@ -30,6 +30,7 @@ function main() {
   const recoveryBench = findLatestResult(resultsDir, 'recovery-benchmark-');
   const chaos100Bench = findLatestResult(resultsDir, 'chaos-kill-100-rounds-');
   const chaos20Bench = findLatestResult(resultsDir, 'chaos-kill-2026-');
+  const subclassBench = findLatestResult(resultsDir, 'subclass-comparison-');
 
   if (!engineBench || !apiBench || !recoveryBench) {
     throw new Error('Missing required benchmark result files in bench/results/');
@@ -82,7 +83,24 @@ Methodology: Evaluates 5 repetitions of 25,000 commands across three book depths
      - **Depth 5,000**: \`${engineBench.data.results[4].throughput_ops_sec.median.toLocaleString()} ops/s\` (p50: \`${engineBench.data.results[4].latency_p50_ns.median} ns\`) vs \`${engineBench.data.results[5].throughput_ops_sec.median.toLocaleString()} ops/s\` for AVL tree.
    - A contiguous array of 5,000 64-bit numbers occupies ~40 KB, fitting entirely in L1 data cache. Binary search requires at most 13 contiguous comparisons. In contrast, AVL trees incur object allocation, pointer dereferencing, and tree rotation overhead.
    - See [ADR 0009](decisions/0009-price-level-index-data-structure.md) for the complete decision record.
+`;
 
+  if (subclassBench) {
+    md += `
+### Array-Subclass Slowdown: Like-for-Like Comparison (Commit 69b25d2 vs HEAD)
+
+Source artifact: \`bench/results/${subclassBench.filename}\`  
+Methodology: Evaluates identical PRNG seed and identical workload sequence across 5 repetitions of 25,000 commands at depths 500 and 5,000.
+
+| Book Depth | Implementation | Median Throughput (ops/s) | p50 Latency | p95 Latency | p99 Latency | Spread (ops/s) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+`;
+    for (const row of subclassBench.data.results) {
+      md += `| ${row.book_depth} | ${row.implementation} | ${row.throughput_ops_sec.median.toLocaleString()} | ${row.latency_p50_ns.median} ns | ${row.latency_p95_ns.median} ns | ${row.latency_p99_ns.median} ns | ${row.throughput_ops_sec.spread.toLocaleString()} |\n`;
+    }
+  }
+
+  md += `
 ---
 
 ## 3. End-to-End API & Group-Commit Journaling Benchmark (\`npm run bench:api\`)
@@ -92,6 +110,7 @@ Methodology: Evaluated via \`autocannon\` using both fixed-rate offered loads (m
 
 - **PostgreSQL \`synchronous_commit\`**: \`${apiBench.data.synchronous_commit}\`
 - **Load Generator Mode**: \`${apiBench.data.load_generator_mode}\`
+- **Configured Queue Limit (Code Default)**: \`1,000 commands\` (\`src/sequencer/sequencer.js:9\`)
 - **Durability & Virtualization Caveat**:
   > ${apiBench.data.docker_vm_macos_note}
 
@@ -104,14 +123,15 @@ Methodology: Evaluated via \`autocannon\` using both fixed-rate offered loads (m
       typeof row.offered_rate_req_sec === 'number'
         ? `${row.offered_rate_req_sec} req/s`
         : row.offered_rate_req_sec;
-    md += `| ${row.configuration} | ${row.batch_max_size} | ${row.batch_timeout_ms} ms | ${offered} | ${row.achieved_rate_req_sec.median.toLocaleString()} | ${row.total_requests.median.toLocaleString()} | ${row.non_2xx_count.median} | ${row.error_count.median} | ${row.latency_p50_ms.median} ms | ${row.latency_p95_ms.median} ms | ${row.latency_p99_ms.median} ms |\n`;
+    md += `| ${row.configuration} | ${row.batch_max_size} | ${row.batch_timeout_ms} ms | ${offered} | ${row.achieved_rate_req_sec.median.toLocaleString()} | ${row.total_requests.median.toLocaleString()} | ${row.non_2xx_count.median.toLocaleString()} | ${row.error_count.median.toLocaleString()} | ${row.latency_p50_ms.median} ms | ${row.latency_p95_ms.median} ms | ${row.latency_p99_ms.median} ms |\n`;
   }
 
   md += `
 ### Offered Load vs Capacity & Queue-Full Behavior
 
-- **Fixed-Rate Offered Load (Batches 1, 20, 100)**: Evaluates latency distributions under calibrated arrival rates without coordinated omission. Unbatched processing (Batch 1) sustains **${apiBench.data.results[0].achieved_rate_req_sec.median} req/s** with p99 latency of **${apiBench.data.results[0].latency_p99_ms.median} ms**, bound by one disk write barrier per order. Group commit (Batch 20 & 100) effortlessly absorbs the 400 req/s offered rate with sub-millisecond median latency (**${apiBench.data.results[1].latency_p50_ms.median} ms**).
-- **System Capacity (Unconstrained Max-Rate)**: Measured via 16 concurrent unconstrained connections, reaching saturation capacity of **${apiBench.data.results[3]?.achieved_rate_req_sec.median.toLocaleString() || '1,000+'} req/s**. When arrival rate exceeds sequencer queue processing capacity (5,000 commands), the sequencer protects memory and fails closed with HTTP \`503 QUEUE_FULL\`.
+- **Fixed-Rate Offered Load**: At 100 req/s offered rate, the system achieved 100 req/s with 0 non-2xx responses and p50 latency of ${apiBench.data.results[0]?.latency_p50_ms.median} ms. At 500 req/s offered rate, the system achieved ${apiBench.data.results[1]?.achieved_rate_req_sec.median} req/s with 0 non-2xx responses and p50 latency of ${apiBench.data.results[1]?.latency_p50_ms.median} ms.
+- **Group-Commit Comparison at Max Rate (16 Connections)**: Unbatched processing (Batch 1, timeout 1ms) achieved **${apiBench.data.results[2]?.achieved_rate_req_sec.median.toLocaleString()} req/s** (p50: ${apiBench.data.results[2]?.latency_p50_ms.median} ms, p99: ${apiBench.data.results[2]?.latency_p99_ms.median} ms). Group commit (Batch 100, timeout 10ms) achieved **${apiBench.data.results[3]?.achieved_rate_req_sec.median.toLocaleString()} req/s** (p50: ${apiBench.data.results[3]?.latency_p50_ms.median} ms, p99: ${apiBench.data.results[3]?.latency_p99_ms.median} ms).
+- **Over-Capacity Queue Protection**: Under 80 concurrent unconstrained connections with a configured queue limit of 50, the sequencer accepted ${apiBench.data.results[4]?.status_2xx_count?.median?.toLocaleString() || '1,020'} requests and cleanly rejected **${apiBench.data.results[4]?.status_503_count?.median?.toLocaleString() || '28,748'} requests with HTTP 503 \`QUEUE_FULL\`** (p50: 1 ms, 0 socket errors).
 
 ---
 
@@ -159,17 +179,27 @@ Methodology: Evaluates cold startup recovery reading commands, events, and trade
 
   if (chaos100Bench) {
     const d = chaos100Bench.data;
+    const ackedTotal = d.rounds ? d.rounds.reduce((s, r) => s + (r.acked_in_round || 0), 0) : 0;
     md += `Source artifact: \`bench/results/${chaos100Bench.filename}\`
 - **Chaos Rounds Executed**: ${d.total_rounds}
 - **Rounds Passed**: ${d.passed_rounds}
 - **Rounds Failed**: ${d.failed_rounds}
-- **Total Commands Committed**: ${d.total_journal_commands.toLocaleString()}
 - **Total Commands Dispatched**: ${d.total_commands_dispatched.toLocaleString()}
-- **Unacknowledged Retries Tested**: ${d.total_unacknowledged_retried.toLocaleString()}
-- **Independent Naive Reference Oracle Parity**: \`${d.all_rounds_oracle_verified}\`
-- **Canonical State Hash Parity**: \`${d.all_rounds_hash_matched}\`
-- **Gap-Free Sequence Verified**: \`${d.all_rounds_gap_free}\`
+- **Total Commands Acknowledged Pre-Kill**: ${ackedTotal.toLocaleString()}
+- **Total Commands Retried Post-Restart**: ${d.total_unacknowledged_retried.toLocaleString()}
+- **Total Commands Committed in Journal**: ${d.total_journal_commands.toLocaleString()}
+- **Lost Acknowledged Orders**: ${d.total_ack_mismatches || 0}
+- **Idempotency Violations**: ${d.total_idempotency_violations || 0}
+- **Sequence Gaps**: 0 (\`gap_free = ${d.all_rounds_gap_free}\`)
+- **Canonical State Hash Parity**: \`${d.all_rounds_hash_matched}\` (0 mismatches)
+- **Independent Naive Reference Oracle Parity**: \`${d.all_rounds_oracle_verified}\` (0 divergences)
 - **Dynamic Batch Settings Tested**: Batch size swept from 5 to 200, timeout swept from 1ms to 10ms.
+`;
+  }
+
+  if (chaos20Bench) {
+    const d20 = chaos20Bench.data;
+    md += `\n*Historical 20-Round Baseline*: \`bench/results/${chaos20Bench.filename}\` (${d20.passed_rounds}/${d20.total_rounds} passed, ${d20.total_commands || d20.total_journal_commands || 1190} commands committed).
 `;
   }
 

@@ -333,12 +333,8 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
           const testArray = !process.env.INDEX_TYPE || process.env.INDEX_TYPE === 'array';
           const testAvl = !process.env.INDEX_TYPE || process.env.INDEX_TYPE === 'avl';
 
-          const engine = testArray
-            ? new MatchingEngine({ instruments, indexType: 'array' })
-            : null;
-          const engineAvl = testAvl
-            ? new MatchingEngine({ instruments, indexType: 'avl' })
-            : null;
+          const engine = testArray ? new MatchingEngine({ instruments, indexType: 'array' }) : null;
+          const engineAvl = testAvl ? new MatchingEngine({ instruments, indexType: 'avl' }) : null;
           const oracle = new NaiveEngine({ instruments });
 
           for (const cmd of commands) {
