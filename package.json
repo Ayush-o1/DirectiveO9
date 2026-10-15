@@ -10,6 +10,7 @@
     "start": "node src/index.js",
     "test": "node --test",
     "test:coverage": "c8 --reporter=text --reporter=lcov node --test",
+    "test:diff:long": "LONG_DIFF=true node --test test/differential.test.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

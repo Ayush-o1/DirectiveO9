@@ -197,12 +197,27 @@ When a command fails validation, the engine emits an `ORDER_REJECTED` event with
 
 1. `INVALID_TICK`: Price is not a positive multiple of the instrument's `tick_size`.
 2. `INVALID_LOT`: Quantity is not a positive multiple of the instrument's `lot_size`.
-3. `NON_POSITIVE_QUANTITY`: Quantity is less than or equal to zero.
-4. `UNKNOWN_INSTRUMENT`: Symbol does not exist in registered instruments.
-5. `UNKNOWN_ORDER`: Cancel command targets an order ID that does not exist in the active book.
-6. `NOT_OWNER`: Cancel command participant does not match the participant who placed the order.
-7. `ALREADY_TERMINAL`: Command targets an order that has already been FILLED, CANCELLED, or REJECTED.
-8. `QUEUE_FULL`: Sequencer or book capacity threshold exceeded.
+3. `INVALID_SIDE`: Side string is not `"BUY"` or `"SELL"`.
+4. `NON_POSITIVE_QUANTITY`: Quantity is less than or equal to zero.
+5. `UNKNOWN_INSTRUMENT`: Symbol does not exist in registered instruments.
+6. `UNKNOWN_ORDER`: Cancel command targets an order ID that does not exist in the active book for the specified symbol.
+7. `NOT_OWNER`: Cancel command participant does not match the participant who placed the order.
+8. `ALREADY_TERMINAL`: Command targets an order that has already reached a terminal state (`FILLED`, `CANCELLED`, or `REJECTED`).
+9. `DUPLICATE_ORDER`: An order with the specified internal `order_id` already exists within the engine's order index.
+10. `QUEUE_FULL`: Sequencer or bounded ingress queue capacity threshold exceeded (HTTP 503 at API boundary).
+
+### Distinction: Engine-Level `DUPLICATE_ORDER` vs API-Level Idempotency
+
+It is critical to distinguish between duplicate rejection at the core engine and idempotent retry handling at the API sequencer:
+
+- **Engine Level (`DUPLICATE_ORDER`)**:
+  The matching engine operates on monotonic, engine-assigned internal order identifiers (`order_id`, derived deterministically from the sequencer command `seq`). If the engine is ever commanded to place an order whose `order_id` already exists in its internal index (`this.orders`), it emits an `ORDER_REJECTED` event with code `DUPLICATE_ORDER`. This invariant protects the order book and doubly linked list pointers against identity collisions and state corruption.
+
+- **API / Sequencer Level (Idempotency on `client_order_id`)**:
+  External participants interact with the system using client-scoped identifiers: `(participant_id, client_order_id)`. The API and Sequencer layer intercepts retries before the matching engine:
+  - **Identical Retry**: When a client submits a command with a `(participant_id, client_order_id)` that was previously sequenced and committed, and the payload matches the original request, the API returns the original HTTP status code and event payload without generating a new `seq`, without writing a duplicate journal row, and without re-invoking the matching engine.
+  - **Mismatched Payload (Conflict)**: When a client reuses an existing `client_order_id` with different order parameters (e.g., changed price, quantity, or side), the API immediately returns HTTP 409 Conflict. The conflicting command is never sequenced and never reaches the matching engine.
+  - Therefore, healthy client retries never cause an engine-level `DUPLICATE_ORDER`. That reject code acts as an internal defensive guard against sequencer sequence drift or replay corruption.
 
 ---
 
