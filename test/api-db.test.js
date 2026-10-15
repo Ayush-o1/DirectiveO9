@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 
 import { createPool, getPool } from '../src/db/pool.js';
 import { runMigrations } from '../src/db/migrator.js';
+import { seedDatabase } from '../scripts/seed.js';
 import { createAuthMiddleware, createAdminAuthMiddleware } from '../src/api/auth.js';
 import { createApp } from '../src/api/app.js';
 import { Sequencer } from '../src/sequencer/sequencer.js';
@@ -17,7 +18,13 @@ import { createOrderSchema } from '../src/api/validation.js';
 const execFileAsync = promisify(execFile);
 
 describe('Database Module Coverage (src/db/pool.js & src/db/migrator.js)', () => {
-  it('covers createPool options (custom pool, DATABASE_URL)', () => {
+  before(async () => {
+    const pool = getPool();
+    await runMigrations({ pool });
+    await seedDatabase(pool);
+  });
+
+  it('covers createPool options (custom pool, DATABASE_URL, defaults)', () => {
     const dummyPool = { query: () => {} };
     const wrapped = createPool({ pool: dummyPool });
     assert.equal(wrapped, dummyPool);
@@ -32,6 +39,28 @@ describe('Database Module Coverage (src/db/pool.js & src/db/migrator.js)', () =>
       process.env.DATABASE_URL = prevUrl;
     } else {
       delete process.env.DATABASE_URL;
+    }
+
+    // Test default fallbacks when env vars are absent
+    const savedEnv = {
+      PGHOST: process.env.PGHOST,
+      PGPORT: process.env.PGPORT,
+      PGUSER: process.env.PGUSER,
+      PGPASSWORD: process.env.PGPASSWORD,
+      PGDATABASE: process.env.PGDATABASE,
+    };
+    delete process.env.PGHOST;
+    delete process.env.PGPORT;
+    delete process.env.PGUSER;
+    delete process.env.PGPASSWORD;
+    delete process.env.PGDATABASE;
+
+    const defaultPool = createPool();
+    assert.ok(defaultPool);
+    defaultPool.end();
+
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v !== undefined) process.env[k] = v;
     }
   });
 
