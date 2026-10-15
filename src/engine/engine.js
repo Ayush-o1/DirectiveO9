@@ -46,8 +46,11 @@ export class MatchingEngine {
 
     // Invariant 4: For every order, filled_qty + remaining_qty == original_qty
     for (const order of this.orders.values()) {
-      const filled = order.original_qty - order.remaining_qty;
-      if (filled + order.remaining_qty !== order.original_qty) {
+      if (
+        order.remaining_qty < 0 ||
+        order.filled_qty < 0 ||
+        order.filled_qty + order.remaining_qty !== order.original_qty
+      ) {
         throw new Error(
           `Invariant violation: order ${order.order_id} quantity conservation failed`
         );
@@ -59,17 +62,7 @@ export class MatchingEngine {
 
   processCommand(command) {
     // Pure function requirement: engine must never mutate input command
-    const {
-      type,
-      order_id,
-      participant_id,
-      symbol,
-      side,
-      price,
-      quantity,
-      seq,
-      ts,
-    } = command;
+    const { type, order_id, participant_id, symbol, side, price, quantity, seq, ts } = command;
 
     const events = [];
 
@@ -93,6 +86,18 @@ export class MatchingEngine {
     if (type === 'CANCEL') {
       const existing = this.orders.get(order_id);
       if (!existing) {
+        events.push({
+          event: 'ORDER_REJECTED',
+          code: 'UNKNOWN_ORDER',
+          order_id,
+          participant_id,
+          seq,
+          ts,
+        });
+        return events;
+      }
+
+      if (existing.symbol !== symbol) {
         events.push({
           event: 'ORDER_REJECTED',
           code: 'UNKNOWN_ORDER',
@@ -268,6 +273,7 @@ export class MatchingEngine {
 
         const makerRecord = this.orders.get(makerNode.order_id);
         makerRecord.remaining_qty = makerNode.remaining_qty;
+        makerRecord.filled_qty = (makerRecord.filled_qty ?? 0) + matchQty;
 
         events.push({
           event: 'TRADE_EXECUTED',
@@ -317,6 +323,7 @@ export class MatchingEngine {
         side,
         price: price ?? null,
         original_qty: quantity,
+        filled_qty: quantity,
         remaining_qty: 0,
         state: 'FILLED',
         seq,
@@ -346,6 +353,7 @@ export class MatchingEngine {
           side,
           price,
           original_qty: quantity,
+          filled_qty: filledQty,
           remaining_qty,
           state: restingState,
           seq,
@@ -382,6 +390,7 @@ export class MatchingEngine {
           side,
           price,
           original_qty: quantity,
+          filled_qty: filledQty,
           remaining_qty,
           state: 'CANCELLED',
           seq,
@@ -409,6 +418,7 @@ export class MatchingEngine {
           side,
           price: null,
           original_qty: quantity,
+          filled_qty: filledQty,
           remaining_qty,
           state: 'CANCELLED',
           seq,

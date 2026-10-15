@@ -55,17 +55,7 @@ export class NaiveEngine {
   }
 
   processCommand(command) {
-    const {
-      type,
-      order_id,
-      participant_id,
-      symbol,
-      side,
-      price,
-      quantity,
-      seq,
-      ts,
-    } = command;
+    const { type, order_id, participant_id, symbol, side, price, quantity, seq, ts } = command;
 
     const events = [];
 
@@ -87,6 +77,18 @@ export class NaiveEngine {
     if (type === 'CANCEL') {
       const existing = this.historicalOrders.get(order_id);
       if (!existing) {
+        events.push({
+          event: 'ORDER_REJECTED',
+          code: 'UNKNOWN_ORDER',
+          order_id,
+          participant_id,
+          seq,
+          ts,
+        });
+        return events;
+      }
+
+      if (existing.symbol !== symbol) {
         events.push({
           event: 'ORDER_REJECTED',
           code: 'UNKNOWN_ORDER',
