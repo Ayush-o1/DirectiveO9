@@ -3,7 +3,12 @@ import { SortedArrayPriceIndex } from './level.js';
 import { AvlTreePriceIndex } from './avl.js';
 
 export class OrderBook {
-  constructor({ symbol, tick_size = 1, lot_size = 1, indexType = 'array' }) {
+  constructor({
+    symbol,
+    tick_size = 1,
+    lot_size = 1,
+    indexType = process.env.INDEX_TYPE || 'array',
+  }) {
     if (!symbol || typeof symbol !== 'string') {
       throw new Error('Symbol must be a non-empty string');
     }
