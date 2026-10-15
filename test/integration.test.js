@@ -13,6 +13,7 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
   let app;
   let server;
   let baseUrl;
+  let failHookActive = false;
 
   const mm1Key = SEED_DATA.participants[0].apiKey;
   const mm2Key = SEED_DATA.participants[1].apiKey;
@@ -31,7 +32,17 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
     await seedDatabase(pool);
 
     const engine = new MatchingEngine();
-    sequencer = new Sequencer({ engine, pool, batchTimeoutMs: 2 });
+    sequencer = new Sequencer({
+      engine,
+      pool,
+      batchTimeoutMs: 2,
+      beforeCommitHook: async () => {
+        if (failHookActive) {
+          failHookActive = false;
+          throw new Error('FAULT_INJECTED_BATCH_COMMIT_FAILURE');
+        }
+      },
+    });
     await sequencer.init();
 
     app = createApp({ sequencer, pool, adminKey: 'key_admin_test_secret_99' });
@@ -45,6 +56,7 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
 
   after(async () => {
     if (server) {
+      server.closeAllConnections?.();
       await new Promise(resolve => server.close(resolve));
     }
     if (sequencer) {
@@ -547,8 +559,8 @@ describe('DirectiveO9 Integration Tests (PostgreSQL Journal, Replay & API)', () 
   it('handles batch commit failure with fail-stop recovery and journal rebuild', async () => {
     const initialSeq = sequencer.lastSeq;
 
-    // Inject commit failure on next batch
-    sequencer._faultInjection = { failCommitOnce: true };
+    // Trigger commit failure on next batch via constructor-injected hook
+    failHookActive = true;
 
     const failRes = await apiRequest('/orders', {
       method: 'POST',

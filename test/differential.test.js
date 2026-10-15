@@ -176,7 +176,7 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
             ts: ts++,
           });
         }
-      } else if (roll <= 82) {
+      } else if (roll <= 81) {
         // Reject: DUPLICATE_ORDER
         if (placedOrders.length > 0) {
           const target = g(fc.constantFrom, ...placedOrders);
@@ -192,7 +192,22 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
             ts: ts++,
           });
         }
-      } else if (roll <= 85) {
+      } else if (roll <= 84) {
+        // Reject: Cross-Symbol CANCEL (targets an existing order under a different symbol)
+        if (placedOrders.length > 0) {
+          const target = g(fc.constantFrom, ...placedOrders);
+          const wrongSymbol = target.symbol === 'BTC-USDT' ? 'ETH-USDT' : 'BTC-USDT';
+          commands.push({
+            type: 'CANCEL',
+            order_id: target.order_id,
+            participant_id: target.participant_id,
+            symbol: wrongSymbol,
+            isCrossSymbol: true,
+            seq: seq++,
+            ts: ts++,
+          });
+        }
+      } else if (roll <= 87) {
         // Reject: UNKNOWN_ORDER
         commands.push({
           type: 'CANCEL',
@@ -202,7 +217,7 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
           seq: seq++,
           ts: ts++,
         });
-      } else if (roll <= 88) {
+      } else if (roll <= 90) {
         // Reject: NOT_OWNER
         if (placedOrders.length > 0) {
           const target = g(fc.constantFrom, ...placedOrders);
@@ -296,6 +311,7 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
       multi_level_sweeps: 0,
       partial_fills: 0,
       cancels: 0,
+      cross_symbol_cancels: 0,
       ioc_remainder_cancels: 0,
       market_remainder_cancels: 0,
       UNKNOWN_INSTRUMENT: 0,
@@ -388,6 +404,9 @@ describe('Differential Testing (MatchingEngine vs NaiveEngine Oracle)', () => {
               } else if (e.event === 'ORDER_REJECTED') {
                 if (counts[e.code] !== undefined) {
                   counts[e.code] += 1;
+                }
+                if (cmd.isCrossSymbol && e.code === 'UNKNOWN_ORDER') {
+                  counts.cross_symbol_cancels += 1;
                 }
               }
             }

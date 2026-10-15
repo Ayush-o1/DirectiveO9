@@ -180,6 +180,7 @@ describe('Sequencer & Idempotency Unit Tests', () => {
     await sequencer._processBatch();
     const res1 = await p1;
     assert.equal(res1.status, 201);
+    await sequencer.close();
   });
 
   it('rejects new enqueue commands with 503 SERVICE_RECOVERING when isRecovering is true', async () => {
@@ -521,5 +522,6 @@ describe('Sequencer & Idempotency Unit Tests', () => {
     });
     assert.equal(cancelRes.status, 200);
     assert.equal(cancelRes.body.success, true);
+    await sequencer.close();
   });
 });

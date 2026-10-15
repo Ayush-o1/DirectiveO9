@@ -344,8 +344,8 @@ DirectiveO9 relies on PostgreSQL write-ahead logging (WAL) for durability and di
 
 ### Primary Source Citations
 
-1. **PostgreSQL Official Documentation**, Chapter 30: _Reliability and the Write-Ahead Log_, Section 30.5: _Asynchronous Commit_. URL: https://www.postgresql.org/docs/current/wal-async-commit.html
-2. **PostgreSQL Official Documentation**, Chapter 20: _Server Configuration_, Section 20.5.1: _Write-Ahead Log (WAL) - synchronous_commit_. URL: https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-SYNCHRONOUS-COMMIT
+1. **PostgreSQL Official Documentation (Version 16)**, Chapter 30: _Reliability and the Write-Ahead Log_, Section 30.5: _Asynchronous Commit_. URL: https://www.postgresql.org/docs/16/wal-async-commit.html
+2. **PostgreSQL Official Documentation (Version 16)**, Chapter 20: _Server Configuration_, Section 20.5.1: _Write-Ahead Log (WAL) - synchronous_commit_. URL: https://www.postgresql.org/docs/16/runtime-config-wal.html#GUC-SYNCHRONOUS-COMMIT
 
 ### The Engineering Trade-Off
 
@@ -361,3 +361,21 @@ DirectiveO9 strictly mandates `synchronous_commit = on` as its operational defau
 - **Journal-Before-Ack Compliance**: DirectiveO9's core contract is that an acknowledgment to a market participant guarantees deterministic recoverability. If `synchronous_commit = off` were used, an unexpected crash could acknowledge an order that subsequently disappears upon restart, permanently corrupting client trust and violating financial auditability.
 - **Micro-Batch Amortization**: Rather than weakening durability to achieve performance, DirectiveO9 resolves the disk latency bottleneck through **group commit micro-batching** in `Sequencer`. The sequencer coalesces up to `BATCH_MAX_SIZE` commands (or waits up to `BATCH_TIMEOUT_MS = 5ms`) and commits them in a single multi-row database transaction. This amortizes the physical `fsync` cost across dozens or hundreds of orders simultaneously, yielding high throughput while strictly maintaining `synchronous_commit = on`.
 - **Benchmarking Benchmark Ceiling**: The benchmark harness supports overriding `synchronous_commit = off` solely for measuring in-memory engine and serialization throughput ceilings without storage hardware constraints.
+
+---
+
+## 15. Known Architectural Limitations
+
+DirectiveO9 is an educational and verifiable deterministic matching engine designed for architectural transparency. The following limitations are documented by design:
+
+1. **Order Registry Retains Terminal Orders**:
+   - The engine maintains an in-memory `Map<order_id, Order>` registry (`this.orders`) that stores all processed orders.
+   - When an order transitions to a terminal state (`FILLED`, `CANCELLED`, or `REJECTED`), it is immediately pruned from the book's price-level FIFO queue, but its entry remains in `this.orders` to service status lookups (`GET /orders/:id`) and ownership checks.
+   - **Impact**: Heap memory consumption grows monotonically with the total lifetime number of orders processed ($O(N)$ memory growth). In an unbounded production environment, a periodic state snapshotting and compaction mechanism would be required to archive terminal orders to cold storage and prune in-memory entries.
+
+2. **Startup Replay Scales with Total Journal Length**:
+   - On process restart or fail-stop recovery, the sequencer rebuilds engine state by sequentially replaying every historical command from sequence 1 to the latest committed sequence in the PostgreSQL `commands` journal.
+   - **Impact**: Startup recovery latency scales linearly with total historical journal size ($O(N)$ recovery time). In an unbounded deployment, periodic canonical state checkpointing (storing snapshot states with their ADR 0002 state hashes) would bound startup replay to only the incremental commands committed since the latest checkpoint.
+
+3. **Self-Trade Prevention (MVP)**:
+   - In the current implementation, orders from the same participant that cross on the book match and execute against each other (generating a valid trade). A production exchange would offer configurable Self-Trade Prevention (STP) policies (e.g., cancel oldest, cancel newest, or decrement and cancel).
