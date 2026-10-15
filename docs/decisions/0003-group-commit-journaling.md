@@ -34,7 +34,7 @@ Adopt Option 3:
 
 - The sequencer acts as a single writer managing a bounded micro-batch queue.
 - Incoming commands are enqueued with their resolution/rejection callbacks.
-- When the batch reaches `BATCH_MAX_SIZE` (default: 100) or `BATCH_TIMEOUT_MS` (default: 2ms) elapses, the sequencer flushes the batch via a parameterized multi-row `INSERT INTO commands (seq, ts, participant_id, client_order_id, type, payload) VALUES ...`.
+- When the batch reaches `BATCH_MAX_SIZE` (default: 100) or `BATCH_TIMEOUT_MS` (default: 5ms) elapses, the sequencer flushes the batch via a parameterized multi-row `INSERT INTO commands (seq, ts, participant_id, client_order_id, type, payload) VALUES ...`.
 - Commands are ordered and sequenced strictly before journal insertion.
 - The default database configuration uses `synchronous_commit = on` to guarantee absolute crash durability.
 - The `synchronous_commit` level is exposed as a configurable parameter (`on`, `off`, `remote_write`) for benchmarking throughput ceilings.

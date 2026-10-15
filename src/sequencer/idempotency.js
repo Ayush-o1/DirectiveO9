@@ -53,6 +53,10 @@ export class IdempotencyCache {
     return this.cache.has(this._key(participantId, clientOrderId));
   }
 
+  delete(participantId, clientOrderId) {
+    return this.cache.delete(this._key(participantId, clientOrderId));
+  }
+
   clear() {
     this.cache.clear();
   }

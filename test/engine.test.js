@@ -160,4 +160,38 @@ describe('MatchingEngine Direct Unit Tests', () => {
     assert.equal(events[0].event, 'ORDER_REJECTED');
     assert.equal(events[0].code, 'UNKNOWN_ORDER');
   });
+
+  it('rejects cancel with UNKNOWN_ORDER if order exists on different symbol', () => {
+    const engine = new MatchingEngine({
+      instruments: [
+        { symbol: 'BTC-USDT', tick_size: 1, lot_size: 1 },
+        { symbol: 'ETH-USDT', tick_size: 1, lot_size: 1 },
+      ],
+    });
+
+    engine.processCommand({
+      type: 'LIMIT',
+      order_id: 1,
+      participant_id: 10,
+      symbol: 'BTC-USDT',
+      side: 'BUY',
+      price: 100,
+      quantity: 5,
+      seq: 1,
+      ts: 1000,
+    });
+
+    const events = engine.processCommand({
+      type: 'CANCEL',
+      order_id: 1,
+      participant_id: 10,
+      symbol: 'ETH-USDT',
+      seq: 2,
+      ts: 1001,
+    });
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].event, 'ORDER_REJECTED');
+    assert.equal(events[0].code, 'UNKNOWN_ORDER');
+  });
 });
