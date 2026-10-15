@@ -4,10 +4,10 @@
 
 All financial values in DirectiveO9 are represented as integers. No floating-point values are permitted in engine state, calculations, or persistent records.
 
-- **Price**: Integer ticks. A price of `10050` with a tick size of `0.01` represents `$100.50`.
-- **Quantity**: Integer lots. A quantity of `50` with a lot size of `1` represents 50 shares/contracts.
-- **Sequence Number (`seq`)**: Strictly monotonic, gap-free 64-bit integer (`BigInt`) assigned by the sequencer.
-- **Timestamp (`ts`)**: Monotonic nanosecond timestamp (`BigInt`) assigned by the sequencer at ingestion.
+- **Price**: Integer ticks represented as JavaScript `Number`, validated at the boundary via `Number.isSafeInteger(price) && price > 0`.
+- **Quantity**: Integer lots represented as JavaScript `Number`, validated at the boundary via `Number.isSafeInteger(quantity) && quantity > 0`.
+- **Sequence Number (`seq`)**: Strictly monotonic, gap-free integer represented as JavaScript `Number` (`Number.isSafeInteger(seq) && seq >= 1`), assigned by the sequencer.
+- **Timestamp (`ts`)**: Monotonic microsecond integer timestamp represented as JavaScript `Number` (`Number.isSafeInteger(ts) && ts > 0`), assigned by the sequencer at ingestion.
 - **Side**: `BUY` or `SELL`.
 - **Order Types**:
   - `LIMIT`: Matches against eligible resting orders. Any remaining unfilled quantity rests on the book at the limit price.
@@ -136,7 +136,7 @@ The following invariants must hold true after every command execution, during re
    - For every executed trade: `bought_qty == sold_qty`.
    - For every symbol: cumulative bought lots equals cumulative sold lots.
 6. **Gap-Free Monotonic Sequence**:
-   - Every processed command has `seq == previous_seq + 1n`.
+   - Every processed command has `seq == previous_seq + 1`.
 
 ---
 

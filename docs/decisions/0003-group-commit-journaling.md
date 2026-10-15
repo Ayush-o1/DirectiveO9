@@ -10,7 +10,7 @@ Accepted
 
 DirectiveO9 enforces a strict architectural invariant: **journal-before-ack**. An order command cannot be acknowledged to an API client until it has been durably appended to the database command journal.
 
-Writing commands one-by-one synchronously through PostgreSQL requires a disk flush (`fsync`) for every transaction commit when `synchronous_commit = on`. On standard SSDs and cloud block stores, this caps sequential throughput at approximately 500 to 2,000 transactions per second per connection.
+Writing commands one-by-one synchronously through PostgreSQL requires a disk flush (`fsync` / `fdatasync`) for every transaction commit when `synchronous_commit = on` (PostgreSQL Documentation, Chapter 30 "Reliability and the Write-Ahead Log"). Sequential individual commits are strictly bound by the storage layer's write and flush latency per transaction.
 
 To achieve higher throughput without sacrificing durability guarantees, the sequencer must amortize disk I/O across batches of commands.
 
@@ -18,15 +18,15 @@ To achieve higher throughput without sacrificing durability guarantees, the sequ
 
 1. **Per-Command Synchronous Insertion**:
    - _Pros_: Simplest implementation. Immediate per-command error handling.
-   - _Cons_: Severe throughput bottleneck dictated strictly by single-thread disk write latency (0.5ms - 2ms per command).
+   - _Cons_: Severe throughput bottleneck dictated strictly by per-transaction disk write and flush latency.
 
 2. **Asynchronous Journaling (Ack Before Write)**:
    - _Pros_: Lowest API latency.
    - _Cons_: Violates the non-negotiable journal-before-ack invariant. A crash after ack but before write results in lost orders and irreconcilable client state.
 
 3. **Sequencer-Level Group Commit (Micro-Batching)**:
-   - _Pros_: The sequencer accepts commands into a bounded queue. A single writer worker drains the queue either when a batch size threshold is reached (e.g., 50 commands) or a microsecond timer expires (e.g., 2ms). The batch is written to PostgreSQL in a single multi-row `INSERT INTO commands ...` within a single transaction. All waiting client promises in the batch are resolved upon transaction completion.
-   - _Cons_: Adds small queueing delay (sub-millisecond to low millisecond) under sparse load; requires careful promise-management and failure isolation within batches.
+   - _Pros_: The sequencer accepts commands into a bounded queue. A single writer worker drains the queue either when a batch size threshold is reached or a microsecond batch timer expires. The batch is written to PostgreSQL in a single multi-row `INSERT INTO commands ...` within a single transaction. All waiting client promises in the batch are resolved upon transaction completion.
+   - _Cons_: Adds bounded queueing delay under sparse load; requires careful promise-management and failure isolation within batches.
 
 ## Decision
 

@@ -141,11 +141,11 @@ Requests that mutate order state (`POST /orders`, `DELETE /orders/:id`) require 
   ```json
   {
     "status": "VERIFIED",
-    "commands_replayed": 10842,
-    "expected_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "actual_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commands_replayed": 1000,
+    "expected_hash": "<canonical_sha256_hex>",
+    "actual_hash": "<canonical_sha256_hex>",
     "invariants_passed": true,
-    "duration_ms": 142
+    "duration_ms": "<elapsed_ms>"
   }
   ```
 
@@ -167,8 +167,8 @@ Requests that mutate order state (`POST /orders`, `DELETE /orders/:id`) require 
       "volume_conservation": true,
       "gap_free_sequence": true
     },
-    "current_seq": 10842,
-    "canonical_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "current_seq": 1000,
+    "canonical_hash": "<canonical_sha256_hex>"
   }
   ```
 
