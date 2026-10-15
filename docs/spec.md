@@ -281,11 +281,45 @@ The following invariants must hold true after every command execution, during re
 
 ---
 
-## 10. Idempotency Specification
+## 10. Idempotency and Deduplication Specification
 
-A submission of `(participant_id, client_order_id)` that matches an existing journal entry:
+DirectiveO9 provides end-to-end idempotency backed authoritatively by the database journal:
 
-- Returns the original command execution result, including original `seq`, generated events, and trade fills.
-- Does not modify engine state.
-- Does not increment the sequence number.
-- Does not emit a rejection event.
+1. **Source of Truth**:
+   The PostgreSQL relational unique constraint `UNIQUE (participant_id, client_order_id)` on the `commands` table is the definitive source of truth for idempotency.
+2. **In-Memory Cache**:
+   The sequencer maintains a bounded LRU cache mapping `(participant_id, client_order_id)` to a canonical SHA-256 payload hash and the recorded execution result. This cache provides O(1) response for immediate retries without querying PostgreSQL. The cache is fully rebuildable upon startup by replaying the command journal.
+3. **Identical Retries**:
+   A submission of `(participant_id, client_order_id)` whose canonical payload matches the recorded hash returns the original execution result, including original `seq`, status code, and emitted events. It does not modify engine state, does not increment the sequence number, does not write a duplicate journal row, and does not emit a rejection event.
+4. **Conflicting Retries (Payload Mismatch)**:
+   A submission of an existing `(participant_id, client_order_id)` with different order parameters (such as altered price, quantity, side, or symbol) returns HTTP 409 Conflict. The conflicting request is rejected before entering the sequencer queue and never reaches the matching engine.
+5. **In-Flight Coalescing**:
+   Concurrent in-flight requests sharing the same `(participant_id, client_order_id)` within the same micro-batch are coalesced: exactly one command is sequenced and executed, while pending concurrent callers await and receive the identical result.
+
+---
+
+## 11. Deterministic Order ID Derivation
+
+All internal order identifiers (`order_id`) are derived deterministically:
+
+- For order placements (`LIMIT`, `MARKET`, `IOC`), `order_id` is derived directly from the command's monotonic sequence number (`order_id = seq`).
+- Order identifiers are never generated from random UUIDs, pseudo-random generators, or system clocks.
+- Cancel commands (`CANCEL`) explicitly reference the target `order_id`.
+- This deterministic derivation guarantees that replaying the journal from sequence 0 reproduces identical order identifiers, price-level queue structures, and trade execution records across any host or architecture.
+
+---
+
+## 12. Boundary Validation vs. Sequenced Engine Rejections
+
+DirectiveO9 enforces a strict architectural boundary between API schema validation and internal engine rejections:
+
+1. **Schema-Invalid Requests (HTTP 400 Bad Request, Unsequenced)**:
+   - Evaluated at the HTTP API layer prior to queue ingestion (via Zod schema validation).
+   - Examples: malformed JSON, missing mandatory fields, negative or zero prices/quantities, non-safe integers, unrecognized side/type strings.
+   - Handled synchronously with HTTP 400 Bad Request.
+   - **Crucial Invariant**: Schema-invalid requests NEVER receive a sequence number (`seq`), NEVER enter the sequencer queue, and are NEVER written to the command journal.
+
+2. **Domain Rejections by Matching Engine (Sequenced & Journaled)**:
+   - Valid command payloads that fail domain business rules inside the matching engine (e.g., `UNKNOWN_ORDER`, `NOT_OWNER`, `UNKNOWN_INSTRUMENT`, `INVALID_TICK`, `ALREADY_TERMINAL`).
+   - These commands ARE assigned a monotonic sequence number (`seq`), ARE processed by the single-writer sequencer, and ARE persisted to the PostgreSQL `commands` and `events` journal alongside an `ORDER_REJECTED` event.
+   - **Crucial Invariant**: Sequencer sequence numbers have strictly zero gaps (`seq == previous_seq + 1`). Preserving domain rejections in the durable journal ensures that replaying historical commands reproduces the identical sequence of states and rejection events.

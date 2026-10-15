@@ -50,19 +50,26 @@ This document outlines the phased development plan for DirectiveO9, incorporatin
 
 ---
 
-## Phase 3: Sequencer, Journal, and HTTP/SSE API
+## Phase 3: Sequencer, Journal, and HTTP/SSE API [Completed]
 
 - **Objective**: Build durable command persistence, group-commit micro-batching, idempotent ingestion, and the public API.
 - **Deliverables**:
-  - Raw SQL migrations (`migrations/`) establishing tables: `participants`, `instruments`, `commands`, `events`, `orders`, `trades`, with relational constraints and check constraints.
-  - Sequencer single-writer pipeline with group-commit batching (`src/sequencer/`).
-  - In-memory and database-backed idempotency verification on `(participant_id, client_order_id)`.
+  - Plain SQL migrations (`migrations/001_initial_schema.sql`) and lightweight atomic migration runner (`src/db/migrator.js`), justified in ADR 0008.
+  - Relational schema enforcing database constraints: positive price/quantity checks, foreign keys, deterministic primary key sequencing, and unique `(participant_id, client_order_id)` constraint.
+  - Sequencer single-writer pipeline (`src/sequencer/sequencer.js`) with bounded queue (HTTP 503 on full), group-commit micro-batching, and journal-before-ack persistence.
+  - Deterministic order ID derivation (`order_id = seq`) without pseudo-randomness or UUIDs.
+  - Architectural validation boundary: schema-invalid requests rejected synchronously at API boundary (HTTP 400, never sequenced), valid engine rejections sequenced and journaled to guarantee gap-free replay.
+  - In-memory bounded LRU cache with concurrent in-flight request coalescing and database-backed idempotency verification.
   - REST API routes via Express and Zod validation:
     - `POST /orders`, `DELETE /orders/:id`, `GET /orders/:id`
     - `GET /book/:symbol?depth=`, `GET /trades?symbol&from_seq`, `GET /events?from_seq`
     - `GET /health`, `GET /metrics`
-  - Server-Sent Events (SSE) streaming endpoint for real-time book updates and trade execution notifications.
-  - Integration test suite running against PostgreSQL 16 verifying durability, group commits, and concurrent duplicate submissions.
+    - `POST /admin/replay`, `GET /admin/verify`
+  - Server-Sent Events (SSE) streaming endpoint (`/stream`) for real-time book depth snapshots, trade execution notifications, and heartbeats.
+  - SHA-256 hashed API key authentication for participants and dedicated admin credential check.
+  - Startup journal replay routine rebuilding order book state from PostgreSQL.
+  - Database seed script (`scripts/seed.js`) initializing participants and instruments.
+  - Integration test suite (`test/integration.test.js`) running against real PostgreSQL in CI verifying durability, group commits, concurrent duplicate retries, non-owner authorization, queue limits, and book state recovery.
 
 ---
 

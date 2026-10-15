@@ -22,7 +22,7 @@ Hand-written unit tests only test scenarios anticipated by the engineer. To veri
    - _Pros_: Fast execution, deterministic regression baseline.
    - _Cons_: Cannot discover unanticipated edge cases in multi-command interleavings.
 
-2. **Model-Based Testing with `fast-check` and Naive Oracle**:
+2. **Differential Testing with `fast-check` and Naive Oracle**:
    - _Pros_:
      - `fast-check` generates hundreds of randomized, shrinkable command sequences (Limit, Market, IOC, Cancel across multiple participants and price points).
      - An independent naive oracle in `test/oracle/` implements the specification using simple linear scans (no complex data structures).
