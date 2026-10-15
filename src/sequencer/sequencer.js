@@ -313,7 +313,6 @@ export class Sequencer extends EventEmitter {
           this.flushTimer = null;
           this._processBatch();
         }, this.batchTimeoutMs);
-        this.flushTimer.unref?.();
       }
 
       if (this.queue.length >= this.batchMaxSize && !this.isFlushing) {

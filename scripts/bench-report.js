@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -158,6 +159,11 @@ Methodology: Evaluates startup replay scaling from a cold engine state across 3 
 
   const outputPath = path.join(docsDir, 'benchmarks.md');
   fs.writeFileSync(outputPath, md);
+  try {
+    execSync('npx prettier --write docs/benchmarks.md', { stdio: 'ignore' });
+  } catch {
+    // ignore
+  }
   console.log(`Successfully generated docs/benchmarks.md strictly from bench/results/ artifacts.`);
 }
 
